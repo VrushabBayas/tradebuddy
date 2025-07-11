@@ -185,11 +185,11 @@ class SupportResistanceStrategy(BaseStrategy):
             resistance_distance = None
             
             if nearest_support:
-                support_price = self._get_value(nearest_support, 'level', 0)
+                support_price = float(self._get_value(nearest_support, 'level', 0))
                 support_distance = ((current_price - support_price) / current_price) * 100
             
             if nearest_resistance:
-                resistance_price = self._get_value(nearest_resistance, 'level', 0)
+                resistance_price = float(self._get_value(nearest_resistance, 'level', 0))
                 resistance_distance = ((resistance_price - current_price) / current_price) * 100
             
             # Add S/R specific metrics
@@ -234,7 +234,7 @@ class SupportResistanceStrategy(BaseStrategy):
         resistance_levels = []
         
         for level in sr_levels:
-            level_price = self._get_value(level, 'level', 0)
+            level_price = float(self._get_value(level, 'level', 0))
             is_support = self._get_value(level, 'is_support', False)
             
             if is_support:
@@ -307,14 +307,14 @@ class SupportResistanceStrategy(BaseStrategy):
         
         if sr_context.get('nearest_support'):
             support = sr_context['nearest_support']
-            support_price = self._get_value(support, 'level', 0)
+            support_price = float(self._get_value(support, 'level', 0))
             support_strength = self._get_value(support, 'strength', 0)
             distance = sr_context.get('support_distance_pct', 0)
             lines.append(f"Nearest Support: ${support_price:,.2f} (Strength: {support_strength}/10, Distance: {distance:.1f}%)")
         
         if sr_context.get('nearest_resistance'):
             resistance = sr_context['nearest_resistance']
-            resistance_price = self._get_value(resistance, 'level', 0)
+            resistance_price = float(self._get_value(resistance, 'level', 0))
             resistance_strength = self._get_value(resistance, 'strength', 0)
             distance = sr_context.get('resistance_distance_pct', 0)
             lines.append(f"Nearest Resistance: ${resistance_price:,.2f} (Strength: {resistance_strength}/10, Distance: {distance:.1f}%)")

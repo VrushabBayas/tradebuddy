@@ -182,8 +182,8 @@ class EMACrossoverStrategy(BaseStrategy):
                 else:
                     return default
             
-            ema_9 = get_value(ema_crossover, 'ema_9', 0)
-            ema_15 = get_value(ema_crossover, 'ema_15', 0)
+            ema_9 = float(get_value(ema_crossover, 'ema_9', 0))
+            ema_15 = float(get_value(ema_crossover, 'ema_15', 0))
             is_golden_cross = get_value(ema_crossover, 'is_golden_cross', False)
             crossover_strength = get_value(ema_crossover, 'crossover_strength', 0)
             
@@ -380,8 +380,8 @@ class EMACrossoverStrategy(BaseStrategy):
                 else:
                     return default
             
-            ema_9 = get_value(ema_crossover, 'ema_9', 0)
-            ema_15 = get_value(ema_crossover, 'ema_15', 0)
+            ema_9 = float(get_value(ema_crossover, 'ema_9', 0))
+            ema_15 = float(get_value(ema_crossover, 'ema_15', 0))
             crossover_strength = get_value(ema_crossover, 'crossover_strength', 0)
             
             lines.append(f"EMA Values: 9-EMA ${ema_9:,.2f}, 15-EMA ${ema_15:,.2f}")
