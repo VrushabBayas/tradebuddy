@@ -14,7 +14,10 @@ from src.core.models import (
     SessionConfig,
     StrategyType
 )
+from src.core.constants import TradingConstants
 from src.core.exceptions import StrategyError
+from src.utils.data_helpers import get_value
+from src.utils.type_conversion import to_float
 
 logger = structlog.get_logger(__name__)
 
@@ -48,14 +51,6 @@ class SupportResistanceStrategy(BaseStrategy):
         """Support/Resistance requires more data to identify reliable levels."""
         return 25  # Need more data to identify reliable S/R levels
     
-    def _get_value(self, obj, key, default=None):
-        """Safely get value from either Pydantic model or dict."""
-        if hasattr(obj, key):
-            return getattr(obj, key)
-        elif isinstance(obj, dict):
-            return obj.get(key, default)
-        else:
-            return default
 
     async def analyze(
         self,
@@ -110,9 +105,9 @@ class SupportResistanceStrategy(BaseStrategy):
                 symbol=market_data.symbol,
                 signals_count=len(filtered_result.signals),
                 support_levels=len([l for l in technical_analysis.get('support_resistance', []) 
-                                  if self._get_value(l, 'is_support', False)]),
+                                  if get_value(l, 'is_support', False)]),
                 resistance_levels=len([l for l in technical_analysis.get('support_resistance', [])
-                                     if not self._get_value(l, 'is_support', True)]),
+                                     if not get_value(l, 'is_support', True)]),
                 primary_signal=filtered_result.primary_signal.action.value if filtered_result.primary_signal else None
             )
             
@@ -170,14 +165,14 @@ class SupportResistanceStrategy(BaseStrategy):
             nearest_resistance = None
             
             for level in sr_levels:
-                level_price = self._get_value(level, 'level', 0)
-                is_support = self._get_value(level, 'is_support', False)
+                level_price = get_value(level, 'level', 0)
+                is_support = get_value(level, 'is_support', False)
                 
                 if is_support and level_price < current_price:
-                    if nearest_support is None or level_price > self._get_value(nearest_support, 'level', 0):
+                    if nearest_support is None or level_price > get_value(nearest_support, 'level', 0):
                         nearest_support = level
                 elif not is_support and level_price > current_price:
-                    if nearest_resistance is None or level_price < self._get_value(nearest_resistance, 'level', float('inf')):
+                    if nearest_resistance is None or level_price < get_value(nearest_resistance, 'level', float('inf')):
                         nearest_resistance = level
             
             # Calculate distance to levels
@@ -185,11 +180,11 @@ class SupportResistanceStrategy(BaseStrategy):
             resistance_distance = None
             
             if nearest_support:
-                support_price = float(self._get_value(nearest_support, 'level', 0))
+                support_price = to_float(get_value(nearest_support, 'level', 0))
                 support_distance = ((current_price - support_price) / current_price) * 100
             
             if nearest_resistance:
-                resistance_price = float(self._get_value(nearest_resistance, 'level', 0))
+                resistance_price = to_float(get_value(nearest_resistance, 'level', 0))
                 resistance_distance = ((resistance_price - current_price) / current_price) * 100
             
             # Add S/R specific metrics
@@ -198,8 +193,8 @@ class SupportResistanceStrategy(BaseStrategy):
                 'nearest_resistance': nearest_resistance,
                 'support_distance_pct': support_distance,
                 'resistance_distance_pct': resistance_distance,
-                'total_support_levels': len([l for l in sr_levels if self._get_value(l, 'is_support', False)]),
-                'total_resistance_levels': len([l for l in sr_levels if not self._get_value(l, 'is_support', True)]),
+                'total_support_levels': len([l for l in sr_levels if get_value(l, 'is_support', False)]),
+                'total_resistance_levels': len([l for l in sr_levels if not get_value(l, 'is_support', True)]),
                 'price_position': self._determine_price_position(current_price, sr_levels)
             }
             
@@ -234,16 +229,16 @@ class SupportResistanceStrategy(BaseStrategy):
         resistance_levels = []
         
         for level in sr_levels:
-            level_price = float(self._get_value(level, 'level', 0))
-            is_support = self._get_value(level, 'is_support', False)
+            level_price = to_float(get_value(level, 'level', 0))
+            is_support = get_value(level, 'is_support', False)
             
             if is_support:
                 support_levels.append(level_price)
             else:
                 resistance_levels.append(level_price)
         
-        # Check if price is near a level (within 0.5%)
-        tolerance = current_price * 0.005
+        # Check if price is near a level (within configured tolerance)
+        tolerance = current_price * (TradingConstants.SUPPORT_RESISTANCE_TOLERANCE_PCT / 100)
         
         for level_price in support_levels + resistance_levels:
             if abs(current_price - level_price) <= tolerance:
@@ -307,15 +302,15 @@ class SupportResistanceStrategy(BaseStrategy):
         
         if sr_context.get('nearest_support'):
             support = sr_context['nearest_support']
-            support_price = float(self._get_value(support, 'level', 0))
-            support_strength = self._get_value(support, 'strength', 0)
+            support_price = to_float(get_value(support, 'level', 0))
+            support_strength = get_value(support, 'strength', 0)
             distance = sr_context.get('support_distance_pct', 0)
             lines.append(f"Nearest Support: ${support_price:,.2f} (Strength: {support_strength}/10, Distance: {distance:.1f}%)")
         
         if sr_context.get('nearest_resistance'):
             resistance = sr_context['nearest_resistance']
-            resistance_price = float(self._get_value(resistance, 'level', 0))
-            resistance_strength = self._get_value(resistance, 'strength', 0)
+            resistance_price = to_float(get_value(resistance, 'level', 0))
+            resistance_strength = get_value(resistance, 'strength', 0)
             distance = sr_context.get('resistance_distance_pct', 0)
             lines.append(f"Nearest Resistance: ${resistance_price:,.2f} (Strength: {resistance_strength}/10, Distance: {distance:.1f}%)")
         

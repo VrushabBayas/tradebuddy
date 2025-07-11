@@ -5,11 +5,11 @@ Provides functions for calculating position sizes, stop losses, and take profits
 optimized for Delta Exchange 10x leverage trading.
 """
 
-from decimal import Decimal
 from typing import Tuple, Optional, List
 import structlog
 
 from src.core.models import SessionConfig, SignalAction
+from src.utils.type_conversion import to_float
 
 logger = structlog.get_logger(__name__)
 
@@ -34,17 +34,17 @@ def calculate_leveraged_position_size(
     Returns:
         Tuple of (position_value_usd, position_amount_btc, margin_required)
     """
-    # Calculate position value
-    margin_required = account_balance * (position_size_pct / 100)
-    position_value_usd = margin_required * leverage
-    position_amount_btc = position_value_usd / current_price
+    # Calculate position value using safe arithmetic
+    margin_required = to_float(account_balance) * (to_float(position_size_pct) / 100)
+    position_value_usd = margin_required * to_float(leverage)
+    position_amount_btc = position_value_usd / to_float(current_price)
     
     # Adjust to minimum lot size
-    lots_needed = position_amount_btc / min_lot_size
+    lots_needed = position_amount_btc / to_float(min_lot_size)
     adjusted_lots = max(1, round(lots_needed, 3))  # Round to nearest 0.001
-    adjusted_position_btc = adjusted_lots * min_lot_size
-    adjusted_position_usd = adjusted_position_btc * current_price
-    adjusted_margin = adjusted_position_usd / leverage
+    adjusted_position_btc = adjusted_lots * to_float(min_lot_size)
+    adjusted_position_usd = adjusted_position_btc * to_float(current_price)
+    adjusted_margin = adjusted_position_usd / to_float(leverage)
     
     logger.debug(
         "Position size calculated",
@@ -83,20 +83,21 @@ def calculate_stop_loss_take_profit(
     if signal_action not in [SignalAction.BUY, SignalAction.SELL]:
         return None, None, None
     
-    # Calculate stop loss and take profit
-    stop_loss_amount = entry_price * (stop_loss_pct / 100)
-    take_profit_amount = entry_price * (take_profit_pct / 100)
+    # Calculate stop loss and take profit using safe arithmetic
+    stop_loss_amount = to_float(entry_price) * (to_float(stop_loss_pct) / 100)
+    take_profit_amount = to_float(entry_price) * (to_float(take_profit_pct) / 100)
     
+    entry_price_float = to_float(entry_price)
     if signal_action == SignalAction.BUY:
-        stop_loss_price = entry_price - stop_loss_amount
-        take_profit_price = entry_price + take_profit_amount
+        stop_loss_price = entry_price_float - stop_loss_amount
+        take_profit_price = entry_price_float + take_profit_amount
     else:  # SELL
-        stop_loss_price = entry_price + stop_loss_amount
-        take_profit_price = entry_price - take_profit_amount
+        stop_loss_price = entry_price_float + stop_loss_amount
+        take_profit_price = entry_price_float - take_profit_amount
     
-    # Calculate risk-reward ratio
-    risk = abs(entry_price - stop_loss_price)
-    reward = abs(take_profit_price - entry_price)
+    # Calculate risk-reward ratio using safe division
+    risk = abs(entry_price_float - stop_loss_price)
+    reward = abs(take_profit_price - entry_price_float)
     risk_reward_ratio = reward / risk if risk > 0 else None
     
     logger.debug(
@@ -130,12 +131,12 @@ def calculate_position_risk(
     Returns:
         Tuple of (max_loss_usd, max_loss_pct, effective_leverage)
     """
-    # Calculate maximum loss
-    max_loss_usd = position_value_usd * (stop_loss_pct / 100)
-    max_loss_pct = (max_loss_usd / account_balance) * 100
+    # Calculate maximum loss using safe arithmetic
+    max_loss_usd = to_float(position_value_usd) * (to_float(stop_loss_pct) / 100)
+    max_loss_pct = (max_loss_usd / to_float(account_balance)) * 100
     
     # Calculate effective leverage (position value / account balance)
-    effective_leverage = position_value_usd / account_balance
+    effective_leverage = to_float(position_value_usd) / to_float(account_balance)
     
     logger.debug(
         "Position risk calculated",
@@ -183,8 +184,8 @@ def optimize_position_for_delta_exchange(
         stop_loss_pct=float(session_config.stop_loss_pct)
     )
     
-    # Calculate lot size
-    lots = position_amount_btc / float(session_config.min_lot_size)
+    # Calculate lot size using safe conversion
+    lots = position_amount_btc / to_float(session_config.min_lot_size)
     
     return {
         "position_value_usd": position_value_usd,
@@ -194,7 +195,7 @@ def optimize_position_for_delta_exchange(
         "max_loss_usd": max_loss_usd,
         "max_loss_pct": max_loss_pct,
         "effective_leverage": effective_leverage,
-        "risk_reward_ratio": float(session_config.take_profit_pct) / float(session_config.stop_loss_pct)
+        "risk_reward_ratio": to_float(session_config.take_profit_pct) / to_float(session_config.stop_loss_pct)
     }
 
 
@@ -217,15 +218,15 @@ def validate_position_safety(
     warnings = []
     is_safe = True
     
-    # Check maximum loss percentage
+    # Check maximum loss percentage using safe conversion
     max_loss_pct = position_params["max_loss_pct"]
-    if max_loss_pct > float(session_config.max_position_risk):
-        warnings.append(f"Position risk {max_loss_pct:.1f}% exceeds maximum {session_config.max_position_risk}%")
+    if max_loss_pct > to_float(session_config.max_position_risk):
+        warnings.append(f"Position risk {max_loss_pct:.1f}% exceeds maximum {to_float(session_config.max_position_risk)}%")
         is_safe = False
     
-    # Check effective leverage
+    # Check effective leverage using safe conversion
     effective_leverage = position_params["effective_leverage"]
-    if effective_leverage > session_config.leverage * 1.5:
+    if effective_leverage > to_float(session_config.leverage) * 1.5:
         warnings.append(f"Effective leverage {effective_leverage:.1f}x is too high")
         is_safe = False
     
@@ -235,9 +236,9 @@ def validate_position_safety(
         warnings.append(f"Position size {lots:.3f} lots is below minimum (1 lot)")
         is_safe = False
     
-    # Check margin requirement
-    margin_pct = (position_params["margin_required"] / account_balance) * 100
-    if margin_pct > float(session_config.position_size_pct) * 1.2:
-        warnings.append(f"Margin requirement {margin_pct:.1f}% exceeds expected {session_config.position_size_pct}%")
+    # Check margin requirement using safe arithmetic
+    margin_pct = (position_params["margin_required"] / to_float(account_balance)) * 100
+    if margin_pct > to_float(session_config.position_size_pct) * 1.2:
+        warnings.append(f"Margin requirement {margin_pct:.1f}% exceeds expected {to_float(session_config.position_size_pct)}%")
     
     return is_safe, warnings

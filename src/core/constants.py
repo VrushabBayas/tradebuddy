@@ -56,6 +56,42 @@ class TradingConstants:
     # Risk-Reward Ratios
     MIN_RISK_REWARD_RATIO = 1.0
     RECOMMENDED_RISK_REWARD_RATIO = 2.0
+    
+    # Strategy Analysis Thresholds
+    PRICE_TOLERANCE_PCT = 0.5  # 0.5% tolerance for price level comparisons
+    SUPPORT_RESISTANCE_TOLERANCE_PCT = 0.5  # 0.5% tolerance for S/R levels
+    VOLUME_CONFIRMATION_THRESHOLD = 1.2  # 20% above average volume
+    STRONG_VOLUME_THRESHOLD = 1.3  # 30% above average for strong confirmation
+    VERY_STRONG_VOLUME_THRESHOLD = 1.5  # 50% above average for very strong confirmation
+    
+    # EMA Analysis Constants
+    EMA_SEPARATION_WEAK = 1.0  # 1% separation for weak signals
+    EMA_SEPARATION_MODERATE = 1.5  # 1.5% separation for moderate signals  
+    EMA_SEPARATION_STRONG = 2.0  # 2% separation for strong signals
+    
+    # Volume Analysis Periods
+    VOLUME_ANALYSIS_SHORT_PERIOD = 3  # 3 periods for short-term volume analysis
+    VOLUME_ANALYSIS_MEDIUM_PERIOD = 6  # 6 periods for medium-term volume analysis
+    VOLUME_ANALYSIS_LONG_PERIOD = 20  # 20 periods for long-term volume analysis
+    
+    # Confidence Bonuses
+    VOLUME_CONFIDENCE_BONUS = 2  # Bonus points for volume confirmation
+    ALIGNMENT_CONFIDENCE_BONUS = 2  # Bonus points for strategy alignment
+    
+    # Combined Strategy Weights
+    STRATEGY_ALIGNMENT_WEIGHT = 0.4  # 40% weight for strategy alignment
+    SIGNAL_STRENGTH_WEIGHT = 0.3  # 30% weight for signal strength
+    VOLUME_CONFIRMATION_WEIGHT = 0.2  # 20% weight for volume confirmation
+    PRICE_ACTION_WEIGHT = 0.1  # 10% weight for price action consistency
+    
+    # Confirmation Levels
+    STRONG_CONFIRMATION_LEVEL = 8  # Level 8+ for strong confirmation
+    MODERATE_CONFIRMATION_LEVEL = 6  # Level 6+ for moderate confirmation
+    WEAK_CONFIRMATION_LEVEL = 4  # Level 4+ for weak confirmation
+    
+    # Position Risk Constants
+    POSITION_RISK_TOLERANCE_MULTIPLIER = 1.2  # 20% tolerance for position risk
+    LEVERAGE_SAFETY_MULTIPLIER = 1.5  # 50% safety margin for leverage calculations
 
 
 # Ollama Constants

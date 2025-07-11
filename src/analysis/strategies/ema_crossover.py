@@ -16,6 +16,8 @@ from src.core.models import (
 )
 from src.core.constants import TradingConstants
 from src.core.exceptions import StrategyError
+from src.utils.data_helpers import get_value
+from src.utils.type_conversion import to_float
 
 logger = structlog.get_logger(__name__)
 
@@ -174,16 +176,8 @@ class EMACrossoverStrategy(BaseStrategy):
                 return analysis
             
             # Calculate additional EMA metrics - handle both Pydantic models and dicts
-            def get_value(obj, key, default=0):
-                if hasattr(obj, key):
-                    return getattr(obj, key)
-                elif isinstance(obj, dict):
-                    return obj.get(key, default)
-                else:
-                    return default
-            
-            ema_9 = float(get_value(ema_crossover, 'ema_9', 0))
-            ema_15 = float(get_value(ema_crossover, 'ema_15', 0))
+            ema_9 = to_float(get_value(ema_crossover, 'ema_9', 0))
+            ema_15 = to_float(get_value(ema_crossover, 'ema_15', 0))
             is_golden_cross = get_value(ema_crossover, 'is_golden_cross', False)
             crossover_strength = get_value(ema_crossover, 'crossover_strength', 0)
             
@@ -211,7 +205,7 @@ class EMACrossoverStrategy(BaseStrategy):
             
             # Volume confirmation for crossover
             volume_ratio = volume_analysis.get('volume_ratio', 1.0)
-            volume_confirmed = volume_ratio > 1.2  # 20% above average
+            volume_confirmed = volume_ratio > TradingConstants.VOLUME_CONFIRMATION_THRESHOLD
             
             # Calculate momentum score
             momentum_score = self._calculate_momentum_score(
@@ -269,19 +263,19 @@ class EMACrossoverStrategy(BaseStrategy):
         score += crossover_strength * 0.4
         
         # Separation contribution (25%)
-        if separation_pct >= 2.0:
+        if separation_pct >= TradingConstants.EMA_SEPARATION_STRONG:
             score += 2.5
-        elif separation_pct >= 1.0:
+        elif separation_pct >= TradingConstants.EMA_SEPARATION_MODERATE:
             score += 2.0
-        elif separation_pct >= 0.5:
+        elif separation_pct >= TradingConstants.EMA_SEPARATION_WEAK:
             score += 1.5
         else:
             score += 1.0
         
         # Volume contribution (20%)
-        if volume_ratio >= 1.5:
+        if volume_ratio >= TradingConstants.VERY_STRONG_VOLUME_THRESHOLD:
             score += 2.0
-        elif volume_ratio >= 1.2:
+        elif volume_ratio >= TradingConstants.VOLUME_CONFIRMATION_THRESHOLD:
             score += 1.5
         elif volume_ratio >= 1.0:
             score += 1.0
@@ -371,17 +365,9 @@ class EMACrossoverStrategy(BaseStrategy):
         lines = []
         
         if ema_crossover:
-            # Helper function to safely get values from both Pydantic models and dicts
-            def get_value(obj, key, default=0):
-                if hasattr(obj, key):
-                    return getattr(obj, key)
-                elif isinstance(obj, dict):
-                    return obj.get(key, default)
-                else:
-                    return default
-            
-            ema_9 = float(get_value(ema_crossover, 'ema_9', 0))
-            ema_15 = float(get_value(ema_crossover, 'ema_15', 0))
+            # Use the imported get_value function for consistency
+            ema_9 = to_float(get_value(ema_crossover, 'ema_9', 0))
+            ema_15 = to_float(get_value(ema_crossover, 'ema_15', 0))
             crossover_strength = get_value(ema_crossover, 'crossover_strength', 0)
             
             lines.append(f"EMA Values: 9-EMA ${ema_9:,.2f}, 15-EMA ${ema_15:,.2f}")
