@@ -99,7 +99,7 @@ class OllamaConstants:
     """Ollama-related constants."""
     
     DEFAULT_MODEL = "qwen2.5:14b"
-    DEFAULT_TIMEOUT = 30
+    DEFAULT_TIMEOUT = 120
     MAX_RETRIES = 3
     CONTEXT_WINDOW = 32000
     
@@ -164,7 +164,7 @@ class RateLimitConstants:
     
     # Ollama Rate Limits
     OLLAMA_MAX_CONCURRENT_REQUESTS = 3
-    OLLAMA_REQUEST_TIMEOUT = 30
+    OLLAMA_REQUEST_TIMEOUT = 120
 
 
 # Error Codes

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     
     # API Rate Limiting
     delta_api_rate_limit: int = Field(default=10, env="DELTA_API_RATE_LIMIT")
-    ollama_timeout: int = Field(default=30, env="OLLAMA_TIMEOUT")
+    ollama_timeout: int = Field(default=120, env="OLLAMA_TIMEOUT")
     websocket_reconnect_attempts: int = Field(
         default=3, 
         env="WEBSOCKET_RECONNECT_ATTEMPTS"

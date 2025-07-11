@@ -6,13 +6,13 @@ from various sources including Pydantic models, dictionaries, and API responses.
 """
 
 from typing import Any, Optional, Union, Dict, List
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-def get_value(obj: Any, key: str, default: Any = None) -> Any:
+def get_value(obj: Any, key: Union[str, int], default: Any = None) -> Any:
     """
     Safely get value from either Pydantic model or dictionary.
     
@@ -41,15 +41,15 @@ def get_value(obj: Any, key: str, default: Any = None) -> Any:
         'default'
     """
     try:
-        # Try attribute access first (for Pydantic models)
-        if hasattr(obj, key):
-            return getattr(obj, key)
+        # Try index access first (for lists/tuples with numeric key)
+        if isinstance(obj, (list, tuple)) and isinstance(key, int):
+            return obj[key] if 0 <= key < len(obj) else default
         # Try dictionary access (for dicts)
         elif isinstance(obj, dict):
             return obj.get(key, default)
-        # Try index access (for lists/tuples with numeric key)
-        elif isinstance(obj, (list, tuple)) and isinstance(key, int):
-            return obj[key] if 0 <= key < len(obj) else default
+        # Try attribute access (for Pydantic models)
+        elif isinstance(key, str) and hasattr(obj, key):
+            return getattr(obj, key)
         else:
             return default
     except (AttributeError, KeyError, IndexError, TypeError):
@@ -104,7 +104,7 @@ def safe_decimal_conversion(value: Any, default: Decimal = Decimal("0.0")) -> De
             return Decimal(value)
         else:
             return default
-    except (ValueError, TypeError, OverflowError):
+    except (ValueError, TypeError, OverflowError, AttributeError, InvalidOperation):
         return default
 
 
