@@ -206,10 +206,15 @@ class SessionConfig(BaseModel):
     symbol: Symbol = Field(..., description="Trading symbol")
     timeframe: TimeFrame = Field(..., description="Analysis timeframe")
     
-    # Risk management
-    stop_loss_pct: Decimal = Field(default=Decimal("2.5"), description="Stop loss percentage")
-    take_profit_pct: Decimal = Field(default=Decimal("5.0"), description="Take profit percentage")
-    position_size_pct: Decimal = Field(default=Decimal("2.0"), description="Position size percentage")
+    # Risk management (optimized for 10x leverage crypto trading)
+    stop_loss_pct: Decimal = Field(default=Decimal("1.5"), description="Stop loss percentage (tighter for leverage)")
+    take_profit_pct: Decimal = Field(default=Decimal("3.0"), description="Take profit percentage (realistic for crypto)")
+    position_size_pct: Decimal = Field(default=Decimal("5.0"), description="Position size percentage (higher for leverage trading)")
+    
+    # Leverage and position sizing
+    leverage: int = Field(default=10, ge=1, le=100, description="Leverage multiplier (1-100x)")
+    min_lot_size: Decimal = Field(default=Decimal("0.001"), description="Minimum lot size in BTC")
+    max_position_risk: Decimal = Field(default=Decimal("10.0"), description="Maximum position risk percentage")
     
     # Analysis parameters
     confidence_threshold: int = Field(default=6, ge=1, le=10, description="Minimum confidence for signals")

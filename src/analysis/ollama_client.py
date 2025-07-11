@@ -29,8 +29,10 @@ from src.core.models import (
     StrategyType,
     SignalAction,
     SignalStrength,
-    TechnicalIndicator
+    TechnicalIndicator,
+    SessionConfig
 )
+from src.utils.risk_management import calculate_stop_loss_take_profit, optimize_position_for_delta_exchange
 
 logger = structlog.get_logger(__name__)
 
@@ -411,7 +413,8 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
         self,
         ai_response: str,
         market_data: MarketData,
-        strategy: StrategyType
+        strategy: StrategyType,
+        session_config: SessionConfig = None
     ) -> List[TradingSignal]:
         """
         Parse trading signals from AI response.
@@ -448,8 +451,52 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                 
                 # Parse prices
                 entry_price = float(entry_matches[0].replace(',', '')) if entry_matches else market_data.current_price
-                stop_loss = float(stop_loss_matches[0].replace(',', '')) if stop_loss_matches else None
-                take_profit = float(take_profit_matches[0].replace(',', '')) if take_profit_matches else None
+                
+                # Use AI-provided levels or calculate using risk management
+                ai_stop_loss = float(stop_loss_matches[0].replace(',', '')) if stop_loss_matches else None
+                ai_take_profit = float(take_profit_matches[0].replace(',', '')) if take_profit_matches else None
+                
+                # Calculate optimized stop loss and take profit if session config is available
+                if session_config and signal_action in [SignalAction.BUY, SignalAction.SELL]:
+                    calc_stop_loss, calc_take_profit, calc_risk_reward = calculate_stop_loss_take_profit(
+                        entry_price=entry_price,
+                        signal_action=signal_action,
+                        stop_loss_pct=float(session_config.stop_loss_pct),
+                        take_profit_pct=float(session_config.take_profit_pct),
+                        leverage=session_config.leverage
+                    )
+                    
+                    # Use AI levels if provided, otherwise use calculated levels
+                    stop_loss = ai_stop_loss if ai_stop_loss else calc_stop_loss
+                    take_profit = ai_take_profit if ai_take_profit else calc_take_profit
+                    risk_reward_ratio = calc_risk_reward
+                    
+                    # Calculate position parameters
+                    position_params = optimize_position_for_delta_exchange(
+                        session_config=session_config,
+                        current_price=market_data.current_price,
+                        account_balance=10000.0  # Default account balance
+                    )
+                    position_size_pct = float(session_config.position_size_pct)
+                    
+                else:
+                    # Fallback to AI-provided or default values
+                    stop_loss = ai_stop_loss
+                    take_profit = ai_take_profit
+                    position_size_pct = 5.0  # Default 5% for leveraged trading
+                    
+                    # Calculate simple risk-reward ratio
+                    if signal_action in [SignalAction.BUY, SignalAction.SELL] and stop_loss and take_profit:
+                        if signal_action == SignalAction.BUY:
+                            risk = abs(entry_price - stop_loss)
+                            reward = abs(take_profit - entry_price)
+                        else:  # SELL
+                            risk = abs(stop_loss - entry_price)
+                            reward = abs(entry_price - take_profit)
+                        
+                        risk_reward_ratio = reward / risk if risk > 0 else None
+                    else:
+                        risk_reward_ratio = None
                 
                 # Determine signal strength
                 if confidence >= 8:
@@ -463,19 +510,6 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                 reasoning_match = re.search(r"REASONING:\s*(.*?)(?:\n\n|\Z)", ai_response, re.DOTALL | re.IGNORECASE)
                 reasoning = reasoning_match.group(1).strip() if reasoning_match else "AI analysis provided"
                 
-                # Calculate risk-reward ratio
-                risk_reward_ratio = None
-                if signal_action in [SignalAction.BUY, SignalAction.SELL] and stop_loss and take_profit:
-                    if signal_action == SignalAction.BUY:
-                        risk = abs(entry_price - stop_loss)
-                        reward = abs(take_profit - entry_price)
-                    else:  # SELL
-                        risk = abs(stop_loss - entry_price)
-                        reward = abs(entry_price - take_profit)
-                    
-                    if risk > 0:
-                        risk_reward_ratio = reward / risk
-                
                 # Create trading signal
                 signal = TradingSignal(
                     symbol=market_data.symbol,
@@ -488,7 +522,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                     take_profit=take_profit,
                     reasoning=reasoning,
                     risk_reward_ratio=risk_reward_ratio,
-                    position_size_pct=2.0  # Default 2% position size
+                    position_size_pct=position_size_pct
                 )
                 
                 signals.append(signal)
@@ -537,7 +571,8 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
         self,
         market_data: MarketData,
         technical_analysis: Dict[str, Any],
-        strategy: StrategyType
+        strategy: StrategyType,
+        session_config: SessionConfig = None
     ) -> AnalysisResult:
         """
         Analyze market data using AI and generate trading signals.
@@ -596,7 +631,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                 )
             
             # Parse trading signals
-            signals = self._parse_trading_signals(ai_response, market_data, strategy)
+            signals = self._parse_trading_signals(ai_response, market_data, strategy, session_config)
             
             # Calculate execution time
             execution_time = time.time() - start_time

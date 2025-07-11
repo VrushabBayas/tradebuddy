@@ -174,7 +174,8 @@ class BaseStrategy(ABC):
     async def _generate_ai_analysis(
         self,
         market_data: MarketData,
-        technical_analysis: Dict[str, Any]
+        technical_analysis: Dict[str, Any],
+        session_config: SessionConfig = None
     ) -> AnalysisResult:
         """
         Generate AI-powered analysis using Ollama.
@@ -199,7 +200,8 @@ class BaseStrategy(ABC):
             analysis_result = await self.ollama_client.analyze_market(
                 market_data=market_data,
                 technical_analysis=technical_analysis,
-                strategy=self.strategy_type
+                strategy=self.strategy_type,
+                session_config=session_config
             )
             
             ai_time = time.time() - start_time

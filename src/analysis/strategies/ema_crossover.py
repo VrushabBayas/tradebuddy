@@ -86,7 +86,7 @@ class EMACrossoverStrategy(BaseStrategy):
             
             # Generate AI analysis with EMA context
             analysis_result = await self._generate_ai_analysis(
-                market_data, technical_analysis
+                market_data, technical_analysis, session_config
             )
             
             # Filter signals by confidence threshold
