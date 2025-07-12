@@ -98,7 +98,10 @@ class CLIDisplays:
         table.add_row(
             "5", "Market Monitoring 🔄", "Continuous market monitoring with alerts"
         )
-        table.add_row("6", "Exit", "Exit the application")
+        table.add_row(
+            "6", "Strategy Backtesting 📊", "Test strategies against historical data"
+        )
+        table.add_row("7", "Exit", "Exit the application")
 
         return table
 

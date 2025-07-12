@@ -48,10 +48,16 @@ class Settings(BaseSettings):
     default_timeframe: str = Field(default="1h", env="DEFAULT_TIMEFRAME")
     default_strategy: str = Field(default="combined", env="DEFAULT_STRATEGY")
 
-    # Risk Management
+    # Risk Management (Delta Exchange India)
     max_position_size: float = Field(default=5.0, env="MAX_POSITION_SIZE")
     default_stop_loss: float = Field(default=2.5, env="DEFAULT_STOP_LOSS")
     default_take_profit: float = Field(default=5.0, env="DEFAULT_TAKE_PROFIT")
+    default_commission: float = Field(default=0.05, env="DEFAULT_COMMISSION")
+    default_slippage: float = Field(default=0.05, env="DEFAULT_SLIPPAGE")
+    
+    # Currency Configuration
+    base_currency: str = Field(default="INR", env="BASE_CURRENCY")
+    usd_to_inr_rate: float = Field(default=85.0, env="USD_TO_INR_RATE")
 
     # API Rate Limiting
     delta_api_rate_limit: int = Field(default=10, env="DELTA_API_RATE_LIMIT")
@@ -68,6 +74,11 @@ class Settings(BaseSettings):
     # Supported symbols and timeframes
     supported_symbols: List[str] = Field(
         default=["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT", "DOGEUSDT"]
+    )
+    
+    # Indian market symbols (INR pairs)
+    indian_symbols: List[str] = Field(
+        default=["BTCINR", "ETHINR", "SOLINR", "ADAINR", "DOGEINR"]
     )
     supported_timeframes: List[str] = Field(
         default=["1m", "5m", "15m", "1h", "4h", "1d"]
@@ -94,7 +105,7 @@ class Settings(BaseSettings):
             raise ValueError(f"log_level must be one of {valid_levels}")
         return v.upper()
 
-    @field_validator("max_position_size", "default_stop_loss", "default_take_profit")
+    @field_validator("max_position_size", "default_stop_loss", "default_take_profit", "default_commission", "default_slippage")
     @classmethod
     def validate_percentages(cls, v):
         """Validate percentage values are reasonable."""
@@ -102,6 +113,14 @@ class Settings(BaseSettings):
             raise ValueError(f"Value must be positive")
         if v > 100:
             raise ValueError(f"Value cannot exceed 100%")
+        return v
+    
+    @field_validator("usd_to_inr_rate")
+    @classmethod
+    def validate_exchange_rate(cls, v):
+        """Validate USD to INR exchange rate."""
+        if v < 50 or v > 150:
+            raise ValueError(f"Exchange rate must be between 50 and 150")
         return v
 
     @field_validator("cli_refresh_rate")

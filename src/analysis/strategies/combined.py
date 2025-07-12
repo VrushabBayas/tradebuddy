@@ -6,6 +6,7 @@ confidence signals by requiring confirmation from both approaches.
 """
 
 import structlog
+from typing import Any, Dict
 
 from src.analysis.strategies.base_strategy import BaseStrategy
 from src.core.constants import TradingConstants
@@ -577,3 +578,132 @@ class CombinedStrategy(BaseStrategy):
         )
 
         return "\n".join(lines)
+
+    async def _generate_backtesting_signals(
+        self,
+        market_data: MarketData,
+        technical_analysis: Dict[str, Any],
+        session_config: SessionConfig,
+    ) -> AnalysisResult:
+        """
+        Generate Combined strategy signals for backtesting without AI analysis.
+
+        Args:
+            market_data: Market data context
+            technical_analysis: Technical analysis results
+            session_config: Session configuration
+
+        Returns:
+            AnalysisResult with combined strategy signals
+        """
+        from src.core.models import AnalysisResult, TradingSignal, SignalAction, SignalStrength
+
+        logger.debug(
+            "Generating Combined strategy backtesting signals",
+            symbol=market_data.symbol,
+            current_price=market_data.current_price,
+        )
+
+        # Enhance technical analysis with combined specific data
+        enhanced_analysis = self._enhance_combined_analysis(technical_analysis, market_data)
+        
+        combined_context = enhanced_analysis.get("combined_context", {})
+        ema_signal = combined_context.get("ema_signal", {})
+        sr_signal = combined_context.get("sr_signal", {})
+        combined_signal = combined_context.get("combined_signal", {})
+        
+        signals = []
+        
+        if not combined_context:
+            logger.warning("No combined context available for signal generation")
+            return AnalysisResult(
+                symbol=market_data.symbol,
+                timeframe=market_data.timeframe,
+                strategy=self.strategy_type,
+                market_data=market_data,
+                signals=[],
+                ai_analysis="Backtesting mode - no combined analysis data available"
+            )
+
+        # Extract signal data
+        final_direction = combined_signal.get("direction", "neutral")
+        final_confidence = combined_signal.get("confidence", 1)
+        confirmation_level = combined_context.get("confirmation_level", 1)
+        overall_conviction = combined_context.get("overall_conviction", 1)
+        strategy_alignment = combined_context.get("strategy_alignment", "no_alignment")
+        
+        # Signal generation logic - Combined strategy requires high standards
+        signal_action = SignalAction.NEUTRAL
+        confidence = 5
+        reasoning = "No clear combined signal"
+
+        # Only generate signals when both strategies align
+        if (strategy_alignment == "strong_alignment" and 
+            confirmation_level >= TradingConstants.MODERATE_CONFIRMATION_LEVEL):
+            
+            if final_direction == "bullish":
+                signal_action = SignalAction.BUY
+                confidence = max(7, min(10, final_confidence + 1))  # Boost for alignment
+                reasoning = f"Strong combined bullish signal: EMA {ema_signal.get('direction')} + S/R {sr_signal.get('direction')} (conviction: {overall_conviction}/10)"
+                
+            elif final_direction == "bearish":
+                signal_action = SignalAction.SELL
+                confidence = max(7, min(10, final_confidence + 1))  # Boost for alignment
+                reasoning = f"Strong combined bearish signal: EMA {ema_signal.get('direction')} + S/R {sr_signal.get('direction')} (conviction: {overall_conviction}/10)"
+
+        # Partial alignment signals (lower confidence)
+        elif (strategy_alignment == "partial_alignment" and 
+              confirmation_level >= TradingConstants.WEAK_CONFIRMATION_LEVEL and
+              final_direction != "neutral"):
+            
+            if final_direction == "bullish":
+                signal_action = SignalAction.BUY
+                confidence = max(6, min(8, final_confidence))
+                reasoning = f"Partial combined bullish signal: {final_direction} trend with {confirmation_level}/10 confirmation"
+                
+            elif final_direction == "bearish":
+                signal_action = SignalAction.SELL
+                confidence = max(6, min(8, final_confidence))
+                reasoning = f"Partial combined bearish signal: {final_direction} trend with {confirmation_level}/10 confirmation"
+
+        # Create signal if action is not neutral and meets confidence threshold
+        if (signal_action != SignalAction.NEUTRAL and 
+            confidence >= session_config.confidence_threshold):
+            
+            signal = TradingSignal(
+                symbol=market_data.symbol,
+                strategy=self.strategy_type,
+                action=signal_action,
+                strength=SignalStrength.STRONG if confidence >= 8 else SignalStrength.MODERATE if confidence >= 6 else SignalStrength.WEAK,
+                confidence=confidence,
+                entry_price=market_data.current_price,
+                reasoning=reasoning,
+            )
+            signals.append(signal)
+
+            logger.debug(
+                "Combined strategy signal generated",
+                action=signal_action.value,
+                confidence=confidence,
+                alignment=strategy_alignment,
+                confirmation_level=confirmation_level,
+                conviction=overall_conviction,
+            )
+
+        # Create analysis result
+        analysis_result = AnalysisResult(
+            symbol=market_data.symbol,
+            timeframe=market_data.timeframe,
+            strategy=self.strategy_type,
+            market_data=market_data,
+            signals=signals,
+            ai_analysis="Backtesting mode - Combined strategy signals from EMA + S/R technical analysis"
+        )
+
+        # Add strategy context data
+        if enhanced_analysis.get("ema_crossover"):
+            analysis_result.ema_crossover = enhanced_analysis["ema_crossover"]
+        if enhanced_analysis.get("support_resistance"):
+            analysis_result.support_resistance_levels = enhanced_analysis["support_resistance"]
+
+        return analysis_result

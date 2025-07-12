@@ -23,6 +23,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.analysis.strategies.combined import CombinedStrategy
 from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
+from src.backtesting.engine import BacktestEngine
+from src.backtesting.models import BacktestConfig
+from src.backtesting.reports import BacktestReportGenerator
 from src.cli.displays import CLIDisplays
 from src.cli.realtime import RealTimeAnalyzer
 from src.core.config import settings
@@ -77,6 +80,9 @@ class CLIApplication:
                 elif strategy == "MONITORING":
                     # Continuous monitoring flow
                     await self.realtime_analyzer.run_monitoring_session()
+                elif strategy == "BACKTESTING":
+                    # Backtesting flow
+                    await self.run_backtesting_session()
                 else:
                     # Traditional historical analysis flow
                     config = await self.configure_session(strategy)
@@ -117,7 +123,7 @@ class CLIApplication:
 
         # Get user choice
         choice = Prompt.ask(
-            "\nSelect strategy", choices=["1", "2", "3", "4", "5", "6"], default="3"
+            "\nSelect strategy", choices=["1", "2", "3", "4", "5", "6", "7"], default="3"
         )
 
         strategy_map = {
@@ -126,7 +132,8 @@ class CLIApplication:
             "3": StrategyType.COMBINED,
             "4": "REALTIME",  # Special marker for real-time analysis
             "5": "MONITORING",  # Special marker for monitoring mode
-            "6": None,
+            "6": "BACKTESTING",  # Special marker for backtesting
+            "7": None,
         }
 
         selected_strategy = strategy_map[choice]
@@ -135,6 +142,8 @@ class CLIApplication:
             self.console.print(f"\n✅ Selected: Real-Time Analysis", style="green")
         elif selected_strategy == "MONITORING":
             self.console.print(f"\n✅ Selected: Market Monitoring", style="green")
+        elif selected_strategy == "BACKTESTING":
+            self.console.print(f"\n✅ Selected: Strategy Backtesting", style="green")
         elif selected_strategy:
             self.console.print(
                 f"\n✅ Selected: {selected_strategy.value.replace('_', ' ').title()}",
@@ -349,6 +358,177 @@ class CLIApplication:
     def display_goodbye(self):
         """Display goodbye message."""
         self.displays.display_goodbye()
+
+    async def run_backtesting_session(self):
+        """Run interactive backtesting session."""
+        self.console.print("\n📊 Strategy Backtesting", style="bold cyan")
+        self.console.print("Test your strategies against historical market data\n", style="dim")
+
+        try:
+            # Strategy selection for backtesting
+            strategy = await self.select_backtesting_strategy()
+            if strategy is None:
+                return
+
+            # Configure backtesting parameters
+            config = await self.configure_backtesting_parameters(strategy)
+            
+            # Run backtesting
+            await self.execute_backtest(config)
+
+        except Exception as e:
+            self.console.print(f"\n❌ Backtesting failed: {e}", style="red")
+            if settings.is_development:
+                import traceback
+                self.console.print("\n🐛 Traceback:", style="dim")
+                self.console.print(traceback.format_exc(), style="dim")
+
+    async def select_backtesting_strategy(self) -> Optional[StrategyType]:
+        """Select strategy for backtesting."""
+        self.console.print("🎯 Select Strategy to Backtest", style="bold cyan")
+        
+        table = Table(title="Available Strategies for Backtesting")
+        table.add_column("Option", style="cyan", width=6)
+        table.add_column("Strategy", style="white", width=25)
+        table.add_column("Description", style="dim", width=50)
+
+        table.add_row("1", "Support & Resistance", "Test S/R bounce and rejection signals")
+        table.add_row("2", "EMA Crossover", "Test 9/15 EMA crossover signals with filters")
+        table.add_row("3", "Combined Strategy", "Test combined EMA + S/R signals")
+        table.add_row("4", "Cancel", "Return to main menu")
+
+        self.console.print(table)
+
+        choice = Prompt.ask("\nSelect strategy to backtest", choices=["1", "2", "3", "4"], default="2")
+        
+        strategy_map = {
+            "1": StrategyType.SUPPORT_RESISTANCE,
+            "2": StrategyType.EMA_CROSSOVER,
+            "3": StrategyType.COMBINED,
+            "4": None,
+        }
+
+        selected = strategy_map[choice]
+        if selected:
+            self.console.print(f"\n✅ Selected: {selected.value.replace('_', ' ').title()}", style="green")
+        
+        return selected
+
+    async def configure_backtesting_parameters(self, strategy: StrategyType) -> BacktestConfig:
+        """Configure backtesting parameters."""
+        self.console.print(f"\n⚙️ Backtesting Configuration", style="bold cyan")
+
+        # Symbol selection
+        symbol = await self.select_symbol()
+        
+        # Timeframe selection
+        timeframe = await self.select_timeframe()
+        
+        # Backtesting period
+        self.console.print("\n📅 Backtesting Period")
+        days_back = int(Prompt.ask("Days to backtest", choices=["7", "14", "30", "60", "90"], default="30"))
+        
+        # Capital and leverage
+        self.console.print("\n💰 Trading Parameters")
+        initial_capital = float(Prompt.ask("Initial capital (INR)", default="850000"))
+        leverage = int(Prompt.ask("Leverage (1-10x)", choices=[str(i) for i in range(1, 11)], default="5"))
+        
+        # Risk parameters
+        self.console.print("\n🛡️ Risk Management")
+        self.console.print("Delta Exchange India Fees: Futures Taker 0.05%, Maker 0.02%, Options 0.03% + 18% GST")
+        confidence_threshold = int(Prompt.ask("Minimum signal confidence (1-10)", choices=[str(i) for i in range(1, 11)], default="6"))
+        commission_pct = float(Prompt.ask("Commission (%) [Taker: 0.05, Maker: 0.02]", default="0.05"))
+        
+        return BacktestConfig(
+            strategy_type=strategy,
+            symbol=symbol,
+            timeframe=timeframe,
+            days_back=days_back,
+            initial_capital=initial_capital,
+            leverage=leverage,
+            confidence_threshold=confidence_threshold,
+            commission_pct=commission_pct,
+            slippage_pct=0.05,  # Default slippage
+        )
+
+    async def execute_backtest(self, config: BacktestConfig):
+        """Execute backtesting and display results."""
+        self.console.print(f"\n🚀 Starting Backtest", style="bold green")
+        
+        # Display configuration
+        config_table = Table(title="Backtesting Configuration")
+        config_table.add_column("Parameter", style="cyan")
+        config_table.add_column("Value", style="white")
+        
+        config_table.add_row("Strategy", str(config.strategy_type).replace('_', ' ').title())
+        config_table.add_row("Symbol", str(config.symbol))
+        config_table.add_row("Timeframe", str(config.timeframe))
+        config_table.add_row("Period", f"{config.days_back} days")
+        config_table.add_row("Initial Capital", f"₹{config.initial_capital:,.0f}")
+        config_table.add_row("Leverage", f"{config.leverage}x")
+        config_table.add_row("Min Confidence", f"{config.confidence_threshold}/10")
+        config_table.add_row("Commission", f"{config.commission_pct}%")
+        
+        self.console.print(config_table)
+
+        # Progress indicator
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Running backtest...", total=None)
+            
+            # Create and run backtesting engine
+            engine = BacktestEngine(config)
+            result = await engine.run_backtest()
+            
+            progress.update(task, description="Generating HTML report...")
+            
+            # Generate report (INR currency)
+            report_generator = BacktestReportGenerator(currency="INR")
+            report_path = report_generator.generate_report(result)
+            
+            progress.stop()
+
+        # Display results summary
+        self.console.print(f"\n📈 Backtest Results", style="bold green")
+        
+        results_table = Table(title="Performance Summary")
+        results_table.add_column("Metric", style="cyan", width=20)
+        results_table.add_column("Value", style="white", width=15)
+        results_table.add_column("Status", style="white", width=10)
+
+        # Color coding for performance
+        total_return = result.performance_metrics.total_return_pct
+        return_color = "green" if total_return > 0 else "red"
+        
+        max_dd = result.performance_metrics.max_drawdown_pct
+        dd_color = "green" if max_dd < 5 else "yellow" if max_dd < 15 else "red"
+        
+        win_rate = result.performance_metrics.win_rate_pct
+        wr_color = "green" if win_rate > 60 else "yellow" if win_rate > 40 else "red"
+
+        results_table.add_row("Total Return", f"{total_return:.2f}%", f"[{return_color}]{'📈' if total_return > 0 else '📉'}[/]")
+        results_table.add_row("Max Drawdown", f"{max_dd:.2f}%", f"[{dd_color}]{'🛡️' if max_dd < 10 else '⚠️'}[/]")
+        results_table.add_row("Sharpe Ratio", f"{result.performance_metrics.sharpe_ratio:.2f}", "📊")
+        results_table.add_row("Win Rate", f"{win_rate:.1f}%", f"[{wr_color}]{'🎯' if win_rate > 50 else '💔'}[/]")
+        results_table.add_row("Total Trades", str(result.performance_metrics.total_trades), "🔄")
+        results_table.add_row("Profit Factor", f"{result.performance_metrics.profit_factor:.2f}", "💰")
+
+        self.console.print(results_table)
+
+        # Report information
+        self.console.print(f"\n📊 Detailed HTML report generated:", style="bold cyan")
+        self.console.print(f"   📄 {report_path}", style="dim")
+        self.console.print(f"\n💡 Open the HTML file in your browser to view interactive charts and detailed analysis.", style="dim")
+
+        # Ask to open report
+        if Confirm.ask("\nOpen HTML report in browser?", default=True):
+            import webbrowser
+            import os
+            webbrowser.open(f"file://{os.path.abspath(report_path)}")
+            self.console.print("🌐 Report opened in browser", style="green")
 
     async def cleanup(self):
         """Cleanup resources."""

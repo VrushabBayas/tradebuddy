@@ -34,6 +34,19 @@ class APIEndpoints:
 class TradingConstants:
     """Trading-related constants."""
 
+    # Currency and Exchange
+    USD_TO_INR = 85.0  # Exchange rate
+    BASE_CURRENCY = "INR"  # Base currency for reports
+    CURRENCY_SYMBOL = "₹"  # Currency symbol
+    
+    # Delta Exchange India Fee Structure
+    FUTURES_TAKER_FEE = 0.05  # 0.05% for futures
+    FUTURES_MAKER_FEE = 0.02  # 0.02% for futures
+    OPTIONS_TAKER_FEE = 0.03  # 0.03% for options
+    OPTIONS_MAKER_FEE = 0.03  # 0.03% for options
+    GST_RATE = 18.0  # 18% GST on trading fees
+    OPTION_FEE_CAP_PCT = 10.0  # Option fee capped at 10% of premium
+    
     # Risk Management
     MIN_STOP_LOSS_PCT = 0.1
     MAX_STOP_LOSS_PCT = 20.0
@@ -351,6 +364,8 @@ DEFAULT_CONFIG = {
         "default_take_profit": 5.0,
         "default_position_size": 2.0,
         "max_position_size": 5.0,
+        "default_commission": 0.05,  # Futures taker fee
+        "default_slippage": 0.05,
     },
     "analysis": {
         "confidence_threshold": 6,

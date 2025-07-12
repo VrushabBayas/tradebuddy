@@ -6,6 +6,7 @@ or gets rejected, providing clear entry and exit points.
 """
 
 import structlog
+from typing import Any, Dict
 
 from src.analysis.strategies.base_strategy import BaseStrategy
 from src.core.constants import TradingConstants
@@ -355,3 +356,182 @@ class SupportResistanceStrategy(BaseStrategy):
         )
 
         return "\n".join(lines)
+
+    async def _generate_backtesting_signals(
+        self,
+        market_data: MarketData,
+        technical_analysis: Dict[str, Any],
+        session_config: SessionConfig,
+    ) -> AnalysisResult:
+        """
+        Generate Support/Resistance signals for backtesting without AI analysis.
+
+        Args:
+            market_data: Market data context
+            technical_analysis: Technical analysis results
+            session_config: Session configuration
+
+        Returns:
+            AnalysisResult with support/resistance signals
+        """
+        from src.core.models import AnalysisResult, TradingSignal, SignalAction, SignalStrength
+
+        logger.debug(
+            "Generating Support/Resistance backtesting signals",
+            symbol=market_data.symbol,
+            current_price=market_data.current_price,
+        )
+
+        # Enhance technical analysis with S/R specific data
+        enhanced_analysis = self._enhance_sr_analysis(technical_analysis, market_data)
+        
+        sr_context = enhanced_analysis.get("sr_context", {})
+        sr_levels = enhanced_analysis.get("support_resistance", [])
+        volume_analysis = enhanced_analysis.get("volume_analysis", {})
+        
+        signals = []
+        
+        if not sr_levels:
+            logger.warning("No support/resistance levels available for signal generation")
+            return AnalysisResult(
+                symbol=market_data.symbol,
+                timeframe=market_data.timeframe,
+                strategy=self.strategy_type,
+                market_data=market_data,
+                signals=[],
+                ai_analysis="Backtesting mode - no S/R levels identified"
+            )
+
+        current_price = market_data.current_price
+        nearest_support = sr_context.get("nearest_support")
+        nearest_resistance = sr_context.get("nearest_resistance")
+        support_distance_pct = sr_context.get("support_distance_pct")
+        resistance_distance_pct = sr_context.get("resistance_distance_pct")
+        price_position = sr_context.get("price_position", "unknown")
+        
+        # Volume confirmation for signals
+        volume_confirmed = volume_analysis.get("volume_confirmed", False)
+        volume_ratio = volume_analysis.get("volume_ratio", 1.0)
+        
+        # Signal generation logic based on S/R levels
+        signal_action = SignalAction.NEUTRAL
+        confidence = 5
+        reasoning = "No clear signal"
+
+        # Support Bounce - BUY Signal
+        if (nearest_support and support_distance_pct is not None and 
+            support_distance_pct <= TradingConstants.SUPPORT_RESISTANCE_TOLERANCE_PCT):
+            
+            support_strength = get_value(nearest_support, "strength", 0)
+            support_price = to_float(get_value(nearest_support, "level", 0))
+            
+            # Check if price is bouncing off support (price above support but close)
+            if (current_price > support_price and 
+                support_distance_pct <= TradingConstants.SUPPORT_RESISTANCE_TOLERANCE_PCT):
+                
+                signal_action = SignalAction.BUY
+                
+                # Base confidence from support strength
+                confidence = max(6, min(10, 4 + support_strength))
+                
+                # Boost confidence with volume confirmation
+                if volume_confirmed:
+                    confidence = min(10, confidence + 1)
+                
+                # Strong volume boost
+                if volume_ratio >= TradingConstants.VERY_STRONG_VOLUME_THRESHOLD:
+                    confidence = min(10, confidence + 1)
+                
+                reasoning = f"Support bounce at ${support_price:,.2f} (strength: {support_strength}/10, distance: {support_distance_pct:.1f}%)"
+                if volume_confirmed:
+                    reasoning += f" with volume confirmation ({volume_ratio:.1f}x)"
+
+        # Resistance Rejection - SELL Signal
+        elif (nearest_resistance and resistance_distance_pct is not None and 
+              resistance_distance_pct <= TradingConstants.SUPPORT_RESISTANCE_TOLERANCE_PCT):
+            
+            resistance_strength = get_value(nearest_resistance, "strength", 0)
+            resistance_price = to_float(get_value(nearest_resistance, "level", 0))
+            
+            # Check if price is rejecting at resistance (price below resistance but close)
+            if (current_price < resistance_price and 
+                resistance_distance_pct <= TradingConstants.SUPPORT_RESISTANCE_TOLERANCE_PCT):
+                
+                signal_action = SignalAction.SELL
+                
+                # Base confidence from resistance strength
+                confidence = max(6, min(10, 4 + resistance_strength))
+                
+                # Boost confidence with volume confirmation
+                if volume_confirmed:
+                    confidence = min(10, confidence + 1)
+                
+                # Strong volume boost
+                if volume_ratio >= TradingConstants.VERY_STRONG_VOLUME_THRESHOLD:
+                    confidence = min(10, confidence + 1)
+                
+                reasoning = f"Resistance rejection at ${resistance_price:,.2f} (strength: {resistance_strength}/10, distance: {resistance_distance_pct:.1f}%)"
+                if volume_confirmed:
+                    reasoning += f" with volume confirmation ({volume_ratio:.1f}x)"
+
+        # Breakout signals (bonus signals for strong moves)
+        elif (nearest_resistance and resistance_distance_pct is not None and 
+              current_price > to_float(get_value(nearest_resistance, "level", 0)) and
+              resistance_distance_pct <= 2.0 and volume_confirmed):  # Just broke above resistance
+            
+            resistance_strength = get_value(nearest_resistance, "strength", 0)
+            resistance_price = to_float(get_value(nearest_resistance, "level", 0))
+            
+            signal_action = SignalAction.BUY
+            confidence = max(7, min(10, 6 + resistance_strength))
+            reasoning = f"Resistance breakout above ${resistance_price:,.2f} (strength: {resistance_strength}/10) with volume"
+
+        elif (nearest_support and support_distance_pct is not None and 
+              current_price < to_float(get_value(nearest_support, "level", 0)) and
+              support_distance_pct <= 2.0 and volume_confirmed):  # Just broke below support
+            
+            support_strength = get_value(nearest_support, "strength", 0)
+            support_price = to_float(get_value(nearest_support, "level", 0))
+            
+            signal_action = SignalAction.SELL
+            confidence = max(7, min(10, 6 + support_strength))
+            reasoning = f"Support breakdown below ${support_price:,.2f} (strength: {support_strength}/10) with volume"
+
+        # Create signal if action is not neutral
+        if signal_action != SignalAction.NEUTRAL:
+            signal = TradingSignal(
+                symbol=market_data.symbol,
+                strategy=self.strategy_type,
+                action=signal_action,
+                strength=SignalStrength.STRONG if confidence >= 8 else SignalStrength.MODERATE if confidence >= 6 else SignalStrength.WEAK,
+                confidence=confidence,
+                entry_price=market_data.current_price,
+                reasoning=reasoning,
+            )
+            signals.append(signal)
+
+            logger.debug(
+                "Support/Resistance signal generated",
+                action=signal_action.value,
+                confidence=confidence,
+                price_position=price_position,
+                volume_confirmed=volume_confirmed,
+            )
+
+        # Create analysis result
+        support_count = sr_context.get("total_support_levels", 0)
+        resistance_count = sr_context.get("total_resistance_levels", 0)
+        
+        analysis_result = AnalysisResult(
+            symbol=market_data.symbol,
+            timeframe=market_data.timeframe,
+            strategy=self.strategy_type,
+            market_data=market_data,
+            signals=signals,
+            ai_analysis="Backtesting mode - S/R strategy signals generated from technical analysis"
+        )
+
+        # Add S/R levels to result
+        analysis_result.support_resistance_levels = sr_levels
+
+        return analysis_result

@@ -59,6 +59,93 @@ class BaseStrategy(ABC):
         """
         raise NotImplementedError("Subclasses must implement analyze method")
 
+    async def analyze_for_backtesting(
+        self, market_data: MarketData, session_config: SessionConfig
+    ) -> AnalysisResult:
+        """
+        Analyze market data for backtesting without AI analysis.
+
+        This method provides fast technical analysis for backtesting by
+        skipping expensive AI calls and using pure technical indicators
+        for signal generation.
+
+        Args:
+            market_data: Market data to analyze
+            session_config: Session configuration parameters
+
+        Returns:
+            AnalysisResult with signals based on technical analysis
+
+        Raises:
+            DataValidationError: Invalid input data
+            StrategyError: Strategy execution error
+        """
+        logger.debug(
+            "Starting backtesting analysis",
+            strategy=self.strategy_type.value,
+            symbol=market_data.symbol,
+            data_points=len(market_data.ohlcv_data),
+        )
+
+        try:
+            # Validate inputs
+            self._validate_market_data(market_data)
+            self._validate_session_config(session_config)
+
+            # Calculate technical analysis
+            technical_analysis = await self._calculate_technical_analysis(market_data)
+
+            # Generate signals using strategy-specific logic (without AI)
+            analysis_result = await self._generate_backtesting_signals(
+                market_data, technical_analysis, session_config
+            )
+
+            # Filter signals by confidence threshold
+            filtered_result = self._filter_signals_by_confidence(
+                analysis_result, session_config.confidence_threshold
+            )
+
+            logger.debug(
+                "Backtesting analysis completed",
+                strategy=self.strategy_type.value,
+                symbol=market_data.symbol,
+                signals_count=len(filtered_result.signals),
+            )
+
+            return filtered_result
+
+        except Exception as e:
+            logger.error(
+                "Backtesting analysis failed",
+                strategy=self.strategy_type.value,
+                symbol=market_data.symbol,
+                error=str(e),
+            )
+            raise StrategyError(f"Backtesting analysis failed: {str(e)}")
+
+    @abstractmethod
+    async def _generate_backtesting_signals(
+        self,
+        market_data: MarketData,
+        technical_analysis: Dict[str, Any],
+        session_config: SessionConfig,
+    ) -> AnalysisResult:
+        """
+        Generate trading signals for backtesting using technical analysis.
+
+        This method should be implemented by each strategy to provide
+        fast signal generation without AI analysis.
+
+        Args:
+            market_data: Market data context
+            technical_analysis: Technical analysis results
+            session_config: Session configuration
+
+        Returns:
+            AnalysisResult with strategy-specific signals
+        """
+        raise NotImplementedError("Subclasses must implement _generate_backtesting_signals")
+
     def _validate_market_data(self, market_data: MarketData) -> None:
         """
         Validate market data for analysis.

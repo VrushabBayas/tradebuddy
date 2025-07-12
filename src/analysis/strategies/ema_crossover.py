@@ -6,6 +6,7 @@ and generate trading signals with volume confirmation.
 """
 
 import structlog
+from typing import Any, Dict
 
 from src.analysis.strategies.base_strategy import BaseStrategy
 from src.core.constants import TradingConstants
@@ -629,3 +630,134 @@ class EMACrossoverStrategy(BaseStrategy):
             )
 
         return "\n".join(lines)
+
+    async def _generate_backtesting_signals(
+        self,
+        market_data: MarketData,
+        technical_analysis: Dict[str, Any],
+        session_config: SessionConfig,
+    ) -> AnalysisResult:
+        """
+        Generate EMA Crossover signals for backtesting without AI analysis.
+
+        Args:
+            market_data: Market data context
+            technical_analysis: Technical analysis results
+            session_config: Session configuration
+
+        Returns:
+            AnalysisResult with EMA crossover signals
+        """
+        from src.core.models import AnalysisResult, TradingSignal, SignalAction, SignalStrength
+
+        logger.debug(
+            "Generating EMA crossover backtesting signals",
+            symbol=market_data.symbol,
+            current_price=market_data.current_price,
+        )
+
+        # Enhance technical analysis with EMA specific data
+        enhanced_analysis = self._enhance_ema_analysis(technical_analysis, market_data)
+        
+        ema_crossover = enhanced_analysis.get("ema_crossover")
+        ema_context = enhanced_analysis.get("ema_context", {})
+        
+        signals = []
+        
+        if not ema_crossover:
+            logger.warning("No EMA crossover data available for signal generation")
+            return AnalysisResult(
+                symbol=market_data.symbol,
+                timeframe=market_data.timeframe,
+                strategy=self.strategy_type,
+                market_data=market_data,
+                signals=[],
+                ai_analysis="Backtesting mode - no EMA data available"
+            )
+
+        # Extract EMA crossover data
+        is_golden_cross = get_value(ema_crossover, "is_golden_cross", False)
+        crossover_strength = get_value(ema_crossover, "crossover_strength", 0)
+        ema_9 = to_float(get_value(ema_crossover, "ema_9", 0))
+        ema_15 = to_float(get_value(ema_crossover, "ema_15", 0))
+
+        # Get filter states
+        long_signal_valid = ema_context.get("long_signal_valid", False)
+        short_signal_valid = ema_context.get("short_signal_valid", False)
+        all_long_filters_passed = ema_context.get("all_long_filters_passed", False)
+        all_short_filters_passed = ema_context.get("all_short_filters_passed", False)
+        
+        # Signal generation logic based on EMA crossover and filters
+        signal_action = SignalAction.NEUTRAL
+        confidence = 5
+        reasoning = "No clear signal"
+
+        # Golden Cross - BUY Signal
+        if is_golden_cross and long_signal_valid:
+            signal_action = SignalAction.BUY
+            
+            # Base confidence from crossover strength
+            confidence = max(6, min(10, 5 + crossover_strength))
+            
+            # Boost confidence if all filters pass
+            if all_long_filters_passed:
+                confidence = min(10, confidence + 1)
+            
+            # Determine reasoning based on filters
+            if all_long_filters_passed:
+                reasoning = f"Strong EMA golden cross with all filters confirmed (strength: {crossover_strength}/10)"
+            else:
+                reasoning = f"EMA golden cross detected (strength: {crossover_strength}/10)"
+                
+        # Death Cross - SELL Signal  
+        elif not is_golden_cross and short_signal_valid:
+            signal_action = SignalAction.SELL
+            
+            # Base confidence from crossover strength
+            confidence = max(6, min(10, 5 + crossover_strength))
+            
+            # Boost confidence if all filters pass
+            if all_short_filters_passed:
+                confidence = min(10, confidence + 1)
+            
+            # Determine reasoning based on filters
+            if all_short_filters_passed:
+                reasoning = f"Strong EMA death cross with all filters confirmed (strength: {crossover_strength}/10)"
+            else:
+                reasoning = f"EMA death cross detected (strength: {crossover_strength}/10)"
+
+        # Create signal if action is not neutral
+        if signal_action != SignalAction.NEUTRAL:
+            signal = TradingSignal(
+                symbol=market_data.symbol,
+                strategy=self.strategy_type,
+                action=signal_action,
+                strength=SignalStrength.STRONG if confidence >= 8 else SignalStrength.MODERATE if confidence >= 6 else SignalStrength.WEAK,
+                confidence=confidence,
+                entry_price=market_data.current_price,
+                reasoning=reasoning,
+            )
+            signals.append(signal)
+
+            logger.debug(
+                "EMA crossover signal generated",
+                action=signal_action.value,
+                confidence=confidence,
+                crossover_type="golden_cross" if is_golden_cross else "death_cross",
+                filters_passed=all_long_filters_passed if signal_action == SignalAction.BUY else all_short_filters_passed,
+            )
+
+        # Create analysis result
+        analysis_result = AnalysisResult(
+            symbol=market_data.symbol,
+            timeframe=market_data.timeframe,
+            strategy=self.strategy_type,
+            market_data=market_data,
+            signals=signals,
+            ai_analysis="Backtesting mode - EMA crossover strategy signals generated from technical analysis"
+        )
+
+        # Add EMA crossover data to result
+        analysis_result.ema_crossover = ema_crossover
+
+        return analysis_result
