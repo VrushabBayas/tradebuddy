@@ -531,8 +531,8 @@ class RealTimeAnalyzer:
         symbol_table.add_column("Name", style="dim", width=20)
 
         symbol_info = {
-            "1": (Symbol.BTCUSDT, "Bitcoin"),
-            "2": (Symbol.ETHUSDT, "Ethereum"),
+            "1": (Symbol.BTCUSD, "Bitcoin"),
+            "2": (Symbol.ETHUSD, "Ethereum"),
             "3": (Symbol.SOLUSDT, "Solana"),
             "4": (Symbol.ADAUSDT, "Cardano"),
             "5": (Symbol.DOGEUSDT, "Dogecoin"),

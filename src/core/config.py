@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///tradebuddy.db", env="DATABASE_URL")
 
     # Trading Configuration
-    default_symbol: str = Field(default="BTCUSDT", env="DEFAULT_SYMBOL")
+    default_symbol: str = Field(default="BTCUSD", env="DEFAULT_SYMBOL")
     default_timeframe: str = Field(default="1h", env="DEFAULT_TIMEFRAME")
     default_strategy: str = Field(default="combined", env="DEFAULT_STRATEGY")
 

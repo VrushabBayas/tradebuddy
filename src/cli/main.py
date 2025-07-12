@@ -192,8 +192,8 @@ class CLIApplication:
         )
 
         symbol_map = {
-            "1": Symbol.BTCUSDT,
-            "2": Symbol.ETHUSDT,
+            "1": Symbol.BTCUSD,
+            "2": Symbol.ETHUSD,
             "3": Symbol.SOLUSDT,
             "4": Symbol.ADAUSDT,
             "5": Symbol.DOGEUSDT,

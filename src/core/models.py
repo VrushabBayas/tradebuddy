@@ -26,11 +26,11 @@ class TimeFrame(str, Enum):
 class Symbol(str, Enum):
     """Supported trading symbols."""
 
-    BTCUSDT = "BTCUSDT"
-    ETHUSDT = "ETHUSDT"
-    SOLUSDT = "SOLUSDT"
-    ADAUSDT = "ADAUSDT"
-    DOGEUSDT = "DOGEUSDT"
+    BTCUSD = "BTCUSD"
+    ETHUSD = "ETHUSD"
+    SOLUSDT = "SOLUSDT"  # Keep as USDT for now
+    ADAUSDT = "ADAUSDT"  # Keep as USDT for now
+    DOGEUSDT = "DOGEUSDT"  # Keep as USDT for now
 
 
 class StrategyType(str, Enum):
@@ -412,7 +412,7 @@ class RealTimeConfig(BaseModel):
     strategy: StrategyType = Field(
         ..., description="Strategy to use for real-time analysis"
     )
-    symbol: Symbol = Field(default=Symbol.BTCUSDT, description="Trading symbol")
+    symbol: Symbol = Field(default=Symbol.BTCUSD, description="Trading symbol")
     timeframe: TimeFrame = Field(
         default=TimeFrame.ONE_MINUTE, description="Analysis timeframe"
     )
@@ -440,7 +440,7 @@ class MonitoringConfig(BaseModel):
 
     strategy: StrategyType = Field(..., description="Strategy to use for monitoring")
     symbols: List[Symbol] = Field(
-        default=[Symbol.BTCUSDT], description="Symbols to monitor"
+        default=[Symbol.BTCUSD], description="Symbols to monitor"
     )
     timeframe: TimeFrame = Field(
         default=TimeFrame.ONE_MINUTE, description="Monitoring timeframe"

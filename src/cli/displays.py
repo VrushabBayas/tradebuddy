@@ -113,8 +113,8 @@ class CLIDisplays:
         table.add_column("Name", style="dim", width=20)
 
         symbol_info = {
-            "BTCUSDT": "Bitcoin",
-            "ETHUSDT": "Ethereum",
+            "BTCUSD": "Bitcoin",
+            "ETHUSD": "Ethereum", 
             "SOLUSDT": "Solana",
             "ADAUSDT": "Cardano",
             "DOGEUSDT": "Dogecoin",
