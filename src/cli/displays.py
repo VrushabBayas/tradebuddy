@@ -86,6 +86,11 @@ class CLIDisplays:
         )
         table.add_row(
             "5", 
+            "Market Monitoring 🔄", 
+            "Continuous market monitoring with alerts"
+        )
+        table.add_row(
+            "6", 
             "Exit", 
             "Exit the application"
         )

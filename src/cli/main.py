@@ -75,6 +75,9 @@ class CLIApplication:
                 if strategy == "REALTIME":
                     # Real-time analysis flow
                     await self.realtime_analyzer.run_session()
+                elif strategy == "MONITORING":
+                    # Continuous monitoring flow
+                    await self.realtime_analyzer.run_monitoring_session()
                 else:
                     # Traditional historical analysis flow
                     config = await self.configure_session(strategy)
@@ -115,7 +118,7 @@ class CLIApplication:
         # Get user choice
         choice = Prompt.ask(
             "\nSelect strategy",
-            choices=["1", "2", "3", "4", "5"],
+            choices=["1", "2", "3", "4", "5", "6"],
             default="3"
         )
         
@@ -124,13 +127,16 @@ class CLIApplication:
             "2": StrategyType.EMA_CROSSOVER,
             "3": StrategyType.COMBINED,
             "4": "REALTIME",  # Special marker for real-time analysis
-            "5": None
+            "5": "MONITORING",  # Special marker for monitoring mode
+            "6": None
         }
         
         selected_strategy = strategy_map[choice]
         
         if selected_strategy == "REALTIME":
             self.console.print(f"\n✅ Selected: Real-Time Analysis", style="green")
+        elif selected_strategy == "MONITORING":
+            self.console.print(f"\n✅ Selected: Market Monitoring", style="green")
         elif selected_strategy:
             self.console.print(f"\n✅ Selected: {selected_strategy.value.replace('_', ' ').title()}", style="green")
         

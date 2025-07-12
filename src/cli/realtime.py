@@ -19,7 +19,7 @@ import structlog
 from src.core.config import settings
 from src.core.models import (
     StrategyType, Symbol, TimeFrame, SessionConfig, OHLCV, MarketData,
-    RealTimeConfig
+    RealTimeConfig, MonitoringConfig
 )
 from src.data.delta_client import DeltaExchangeClient
 from src.data.websocket_client import DeltaWebSocketClient, process_candlestick_data
@@ -37,6 +37,7 @@ class RealTimeAnalyzer:
     - Real-time strategy analysis
     - Live signal generation
     - Interactive configuration
+    - Continuous market monitoring mode
     """
     
     def __init__(self, console: Console, delta_client: DeltaExchangeClient, 
@@ -363,4 +364,422 @@ class RealTimeAnalyzer:
                 self.console.print(f"📈 EMA: 9=${ema.ema_9:,.2f} | 15=${ema.ema_15:,.2f}")
                 self.console.print(f"   [{crossover_style}]{crossover_type}[/{crossover_style}] (Strength: {ema.crossover_strength}/10)")
         
+        self.console.print("="*60, style="cyan")
+    
+    async def run_monitoring_session(self) -> None:
+        """Run continuous market monitoring mode."""
+        self.console.print(f"\n🚀 Continuous Market Monitoring Mode", style="bold green")
+        
+        try:
+            # Step 1: Configure monitoring session
+            config = await self.configure_monitoring_session()
+            if not config:
+                return
+            
+            # Step 2: Initialize monitoring
+            if not await self.initialize_monitoring(config):
+                return
+            
+            # Step 3: Start continuous monitoring
+            await self.start_continuous_monitoring(config)
+            
+        except Exception as e:
+            logger.error("Monitoring session failed", error=str(e))
+            self.console.print(f"\n❌ Monitoring failed: {e}", style="red")
+            
+            if settings.is_development:
+                import traceback
+                self.console.print("\n🐛 Traceback:", style="dim")
+                self.console.print(traceback.format_exc(), style="dim")
+        
+        # Wait for user input
+        Prompt.ask("\n[dim]Press Enter to return to main menu...[/dim]", default="")
+    
+    async def configure_monitoring_session(self) -> Optional[MonitoringConfig]:
+        """Configure continuous monitoring session with user input."""
+        self.console.print(f"\n⚙️ Monitoring Configuration", style="bold cyan")
+        
+        # Strategy selection
+        strategy = await self._select_monitoring_strategy()
+        if not strategy:
+            return None
+        
+        # Symbol selection (multi-select)
+        symbols = await self._select_monitoring_symbols()
+        if not symbols:
+            return None
+        
+        # Monitoring parameters
+        params = await self._configure_monitoring_parameters()
+        if not params:
+            return None
+        
+        # Create configuration
+        config = MonitoringConfig(
+            strategy=strategy,
+            symbols=symbols,
+            signal_threshold=params["signal_threshold"],
+            refresh_interval=params["refresh_interval"],
+            show_neutral_signals=params["show_neutral"],
+            compact_display=params["compact_display"]
+        )
+        
+        # Display configuration summary
+        self._display_monitoring_config_summary(config)
+        
+        return config
+    
+    async def _select_monitoring_strategy(self) -> Optional[StrategyType]:
+        """Interactive strategy selection for monitoring."""
+        self.console.print("\n🎯 Select Strategy for Continuous Monitoring", style="bold")
+        
+        strategy_table = Table(title="Monitoring Strategies")
+        strategy_table.add_column("Option", style="cyan", width=6)
+        strategy_table.add_column("Strategy", style="white", width=20)
+        strategy_table.add_column("Best For", style="dim", width=30)
+        
+        strategy_table.add_row("1", "EMA Crossover", "Trend detection across timeframes")
+        strategy_table.add_row("2", "Combined Strategy", "High-confidence signals only")
+        
+        self.console.print(strategy_table)
+        
+        choice = Prompt.ask(
+            "\nSelect strategy for monitoring",
+            choices=["1", "2"],
+            default="2"
+        )
+        
+        strategy_map = {
+            "1": StrategyType.EMA_CROSSOVER,
+            "2": StrategyType.COMBINED
+        }
+        
+        selected = strategy_map[choice]
+        self.console.print(f"✅ Selected: {selected.value.replace('_', ' ').title()}", style="green")
+        return selected
+    
+    async def _select_monitoring_symbols(self) -> Optional[List[Symbol]]:
+        """Interactive symbol selection for monitoring."""
+        self.console.print("\n📊 Select Symbols to Monitor", style="bold")
+        
+        symbol_table = Table(title="Available Symbols")
+        symbol_table.add_column("Option", style="cyan", width=6)
+        symbol_table.add_column("Symbol", style="white", width=15)
+        symbol_table.add_column("Name", style="dim", width=20)
+        
+        symbol_info = {
+            "1": (Symbol.BTCUSDT, "Bitcoin"),
+            "2": (Symbol.ETHUSDT, "Ethereum"),
+            "3": (Symbol.SOLUSDT, "Solana"),
+            "4": (Symbol.ADAUSDT, "Cardano"),
+            "5": (Symbol.DOGEUSDT, "Dogecoin")
+        }
+        
+        for option, (symbol, name) in symbol_info.items():
+            symbol_table.add_row(option, symbol.value, name)
+        
+        self.console.print(symbol_table)
+        
+        choices = Prompt.ask(
+            "\nSelect symbols (comma-separated, e.g., 1,2,3)",
+            default="1"
+        )
+        
+        try:
+            selected_options = [opt.strip() for opt in choices.split(",")]
+            symbols = []
+            
+            for opt in selected_options:
+                if opt in symbol_info:
+                    symbols.append(symbol_info[opt][0])
+            
+            if not symbols:
+                self.console.print("❌ No valid symbols selected", style="red")
+                return None
+            
+            symbol_names = [s.value for s in symbols]
+            self.console.print(f"✅ Selected: {', '.join(symbol_names)}", style="green")
+            return symbols
+            
+        except Exception:
+            self.console.print("❌ Invalid symbol selection", style="red")
+            return None
+    
+    async def _configure_monitoring_parameters(self) -> Optional[dict]:
+        """Configure monitoring parameters."""
+        self.console.print("\n⚙️ Monitoring Parameters", style="bold yellow")
+        
+        # Signal threshold
+        signal_threshold = Prompt.ask(
+            "Signal confidence threshold (5-10)",
+            default="7",
+            show_default=True
+        )
+        
+        # Refresh interval
+        refresh_interval = Prompt.ask(
+            "Refresh interval in seconds (30-300)",
+            default="60",
+            show_default=True
+        )
+        
+        # Display options
+        show_neutral = Prompt.ask(
+            "Show neutral/wait signals? (y/n)",
+            default="n",
+            show_default=True
+        ).lower() == "y"
+        
+        compact_display = Prompt.ask(
+            "Use compact display? (y/n)",
+            default="y", 
+            show_default=True
+        ).lower() == "y"
+        
+        try:
+            params = {
+                "signal_threshold": int(signal_threshold),
+                "refresh_interval": int(refresh_interval),
+                "show_neutral": show_neutral,
+                "compact_display": compact_display
+            }
+            
+            # Validate parameters
+            if not 5 <= params["signal_threshold"] <= 10:
+                raise ValueError("Signal threshold must be between 5 and 10")
+            if not 30 <= params["refresh_interval"] <= 300:
+                raise ValueError("Refresh interval must be between 30 and 300 seconds")
+            
+            self.console.print("✅ Monitoring parameters configured", style="green")
+            return params
+            
+        except ValueError as e:
+            self.console.print(f"❌ Invalid parameters: {e}", style="red")
+            return None
+    
+    def _display_monitoring_config_summary(self, config: MonitoringConfig) -> None:
+        """Display monitoring configuration summary."""
+        self.console.print("\n📋 Monitoring Configuration Summary", style="bold cyan")
+        
+        config_table = Table(title="Monitoring Setup")
+        config_table.add_column("Parameter", style="cyan", width=20)
+        config_table.add_column("Value", style="white", width=30)
+        
+        config_table.add_row("Strategy", str(config.strategy).replace('_', ' ').title())
+        config_table.add_row("Symbols", ", ".join([s.value for s in config.symbols]))
+        config_table.add_row("Timeframe", str(config.timeframe))
+        config_table.add_row("Signal Threshold", f"{config.signal_threshold}/10")
+        config_table.add_row("Refresh Interval", f"{config.refresh_interval} seconds")
+        config_table.add_row("Show Neutral", "Yes" if config.show_neutral_signals else "No")
+        config_table.add_row("Compact Display", "Yes" if config.compact_display else "No")
+        
+        self.console.print(config_table)
+    
+    async def initialize_monitoring(self, config: MonitoringConfig) -> bool:
+        """Initialize monitoring buffers and historical data."""
+        self.console.print("\n📚 Initializing monitoring buffers...", style="bold yellow")
+        
+        # Create symbol buffers
+        self.monitoring_buffers = {}
+        self.signal_history = {}
+        
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=self.console
+            ) as progress:
+                
+                for symbol in config.symbols:
+                    task = progress.add_task(f"Loading {symbol.value} data...", total=None)
+                    
+                    # Initialize buffer for this symbol
+                    self.monitoring_buffers[symbol] = deque(maxlen=config.buffer_size)
+                    self.signal_history[symbol] = deque(maxlen=50)  # Keep last 50 signals
+                    
+                    # Load historical data
+                    historical_data = await self.delta_client.get_market_data(
+                        symbol=symbol.value,
+                        timeframe=config.timeframe.value,
+                        limit=config.historical_candles
+                    )
+                    
+                    # Add to buffer
+                    for ohlcv in historical_data.ohlcv_data:
+                        self.monitoring_buffers[symbol].append(ohlcv)
+                    
+                    progress.update(task, description=f"✅ {symbol.value} ready ({len(historical_data.ohlcv_data)} candles)")
+                    await asyncio.sleep(0.2)
+            
+            self.console.print(f"💾 Monitoring initialized for {len(config.symbols)} symbols", style="green")
+            return True
+            
+        except Exception as e:
+            self.console.print(f"❌ Failed to initialize monitoring: {e}", style="red")
+            return False
+    
+    async def start_continuous_monitoring(self, config: MonitoringConfig) -> None:
+        """Start continuous market monitoring with periodic analysis."""
+        self.console.print(f"\n📡 Starting Continuous Market Monitoring", style="bold green")
+        self.console.print(f"🔄 Analyzing every {config.refresh_interval} seconds", style="cyan")
+        self.console.print(f"⚠️ Press Ctrl+C to stop monitoring\n", style="yellow")
+        
+        # Get strategy instance
+        strategy_instance = self.strategies[config.strategy]
+        analysis_count = 0
+        
+        try:
+            while True:
+                analysis_count += 1
+                
+                self.console.print(f"🔍 Analysis #{analysis_count} - {datetime.now().strftime('%H:%M:%S')}", style="bold cyan")
+                
+                # Analyze each symbol
+                for symbol in config.symbols:
+                    await self.analyze_symbol_for_monitoring(symbol, config, strategy_instance)
+                
+                # Display monitoring summary if not compact
+                if not config.compact_display:
+                    self.display_monitoring_summary(config)
+                
+                # Wait for next analysis
+                self.console.print(f"⏳ Next analysis in {config.refresh_interval} seconds...\n", style="dim")
+                await asyncio.sleep(config.refresh_interval)
+                
+        except KeyboardInterrupt:
+            self.console.print(f"\n🛑 Monitoring stopped by user", style="cyan")
+            self.console.print(f"📊 Total analyses performed: {analysis_count}", style="green")
+        except Exception as e:
+            self.console.print(f"❌ Monitoring error: {e}", style="red")
+    
+    async def analyze_symbol_for_monitoring(self, symbol: Symbol, config: MonitoringConfig, strategy_instance):
+        """Analyze a single symbol during monitoring."""
+        try:
+            # Get latest market data for this symbol
+            latest_data = await self.delta_client.get_market_data(
+                symbol=symbol.value,
+                timeframe=config.timeframe.value,
+                limit=5  # Just get latest candles
+            )
+            
+            # Update buffer with latest data
+            buffer = self.monitoring_buffers[symbol]
+            for ohlcv in latest_data.ohlcv_data[-2:]:  # Last 2 candles
+                buffer.append(ohlcv)
+            
+            # Run analysis if we have enough data
+            if len(buffer) >= 20:
+                await self.run_monitoring_analysis(symbol, config, strategy_instance)
+            else:
+                needed = 20 - len(buffer)
+                self.console.print(f"📊 {symbol.value}: Need {needed} more candles", style="yellow")
+                
+        except Exception as e:
+            self.console.print(f"❌ {symbol.value} analysis failed: {e}", style="red")
+    
+    async def run_monitoring_analysis(self, symbol: Symbol, config: MonitoringConfig, strategy_instance):
+        """Run strategy analysis for monitoring mode."""
+        try:
+            # Create market data from buffer
+            buffer = self.monitoring_buffers[symbol]
+            ohlcv_list = list(buffer)
+            current_price = float(ohlcv_list[-1].close)
+            
+            # Create session config for strategy
+            session_config = SessionConfig(
+                strategy=config.strategy,
+                symbol=symbol,
+                timeframe=config.timeframe,
+                confidence_threshold=config.signal_threshold
+            )
+            
+            market_data = MarketData(
+                symbol=symbol,
+                timeframe=config.timeframe,
+                current_price=current_price,
+                ohlcv_data=ohlcv_list,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            # Run strategy analysis
+            result = await strategy_instance.analyze(market_data, session_config)
+            
+            # Process and display results
+            self.process_monitoring_results(symbol, result, config, current_price)
+            
+        except Exception as e:
+            self.console.print(f"❌ {symbol.value} strategy analysis failed: {e}", style="red")
+    
+    def process_monitoring_results(self, symbol: Symbol, result, config: MonitoringConfig, current_price: float):
+        """Process and display monitoring analysis results."""
+        # Check for significant signals
+        if result.primary_signal and result.primary_signal.confidence >= config.signal_threshold:
+            signal = result.primary_signal
+            
+            # Add to signal history
+            self.signal_history[symbol].append({
+                'timestamp': datetime.now(),
+                'signal': signal,
+                'price': current_price
+            })
+            
+            # Display alert
+            action_style = "green" if str(signal.action).upper() == "BUY" else "red"
+            
+            if config.compact_display:
+                self.console.print(
+                    f"🚨 {symbol.value}: [{action_style}]{signal.action}[/{action_style}] "
+                    f"({signal.confidence}/10) @ ${current_price:,.2f}",
+                    style="bold"
+                )
+            else:
+                self.display_monitoring_signal_details(symbol, signal, current_price)
+        
+        elif config.show_neutral_signals:
+            self.console.print(f"📊 {symbol.value}: No signals @ ${current_price:,.2f}", style="dim")
+    
+    def display_monitoring_signal_details(self, symbol: Symbol, signal, current_price: float):
+        """Display detailed signal information in monitoring mode."""
+        action_style = "green" if str(signal.action).upper() == "BUY" else "red"
+        
+        self.console.print(Panel(
+            f"🚨 [bold]{symbol.value} SIGNAL ALERT[/bold]\n\n"
+            f"Action: [{action_style}]{signal.action}[/{action_style}]\n"
+            f"Confidence: {signal.confidence}/10\n"
+            f"Current Price: ${current_price:,.2f}\n"
+            f"Entry Price: ${signal.entry_price:,.2f}\n"
+            f"Time: {datetime.now().strftime('%H:%M:%S')}\n\n"
+            f"Reasoning: {signal.reasoning[:100]}...",
+            title=f"🎯 {symbol.value} Alert",
+            style="yellow"
+        ))
+    
+    def display_monitoring_summary(self, config: MonitoringConfig):
+        """Display monitoring session summary."""
+        self.console.print("\n📊 Monitoring Session Summary", style="bold cyan")
+        
+        summary_table = Table(title="Signal Summary")
+        summary_table.add_column("Symbol", style="cyan", width=10)
+        summary_table.add_column("Signals", style="white", width=8)
+        summary_table.add_column("Last Signal", style="white", width=15)
+        summary_table.add_column("Last Price", style="white", width=12)
+        
+        for symbol in config.symbols:
+            signal_count = len(self.signal_history.get(symbol, []))
+            last_signal = "None"
+            last_price = "N/A"
+            
+            if signal_count > 0:
+                latest = self.signal_history[symbol][-1]
+                last_signal = f"{latest['signal'].action} ({latest['signal'].confidence}/10)"
+                last_price = f"${latest['price']:,.2f}"
+            
+            summary_table.add_row(
+                symbol.value,
+                str(signal_count),
+                last_signal,
+                last_price
+            )
+        
+        self.console.print(summary_table)
         self.console.print("="*60, style="cyan")
