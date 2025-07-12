@@ -4,15 +4,23 @@ Unit tests for data helpers utility module.
 Tests the shared data manipulation utilities used across all strategy files.
 """
 
-import pytest
 from decimal import Decimal
 from unittest.mock import Mock
 
+import pytest
+
 from src.utils.data_helpers import (
-    get_value, extract_nested_value, normalize_price_data, 
-    safe_float_conversion, safe_decimal_conversion, is_valid_price,
-    calculate_percentage_change, validate_required_fields,
-    sanitize_symbol, format_large_number, calculate_distance_percentage
+    calculate_distance_percentage,
+    calculate_percentage_change,
+    extract_nested_value,
+    format_large_number,
+    get_value,
+    is_valid_price,
+    normalize_price_data,
+    safe_decimal_conversion,
+    safe_float_conversion,
+    sanitize_symbol,
+    validate_required_fields,
 )
 
 
@@ -24,45 +32,45 @@ class TestGetValue:
         # Create a mock Pydantic model
         mock_model = Mock()
         mock_model.test_attr = "test_value"
-        
+
         result = get_value(mock_model, "test_attr")
         assert result == "test_value"
 
     def test_get_value_from_dict(self):
         """Test getting value from dictionary."""
         test_dict = {"key1": "value1", "key2": 42}
-        
+
         result = get_value(test_dict, "key1")
         assert result == "value1"
-        
+
         result = get_value(test_dict, "key2")
         assert result == 42
 
     def test_get_value_from_list_with_int_key(self):
         """Test getting value from list with integer key."""
         test_list = ["item0", "item1", "item2"]
-        
+
         result = get_value(test_list, 0)
         assert result == "item0"
-        
+
         result = get_value(test_list, 2)
         assert result == "item2"
 
     def test_get_value_from_tuple_with_int_key(self):
         """Test getting value from tuple with integer key."""
         test_tuple = ("item0", "item1", "item2")
-        
+
         result = get_value(test_tuple, 1)
         assert result == "item1"
 
     def test_get_value_with_default(self):
         """Test getting value with default fallback."""
         test_dict = {"existing_key": "value"}
-        
+
         # Non-existent key should return default
         result = get_value(test_dict, "non_existent", "default_value")
         assert result == "default_value"
-        
+
         # Existing key should return actual value
         result = get_value(test_dict, "existing_key", "default_value")
         assert result == "value"
@@ -75,11 +83,11 @@ class TestGetValue:
     def test_get_value_with_invalid_index(self):
         """Test getting value with invalid list index."""
         test_list = ["item0", "item1"]
-        
+
         # Out of bounds index should return default
         result = get_value(test_list, 5, "default")
         assert result == "default"
-        
+
         # Negative index should return default
         result = get_value(test_list, -1, "default")
         assert result == "default"
@@ -90,25 +98,15 @@ class TestExtractNestedValue:
 
     def test_extract_nested_value_from_dict(self):
         """Test extracting nested value from dictionary."""
-        test_data = {
-            "user": {
-                "profile": {
-                    "name": "John"
-                }
-            }
-        }
-        
+        test_data = {"user": {"profile": {"name": "John"}}}
+
         result = extract_nested_value(test_data, "user.profile.name")
         assert result == "John"
 
     def test_extract_nested_value_with_missing_key(self):
         """Test extracting nested value with missing key."""
-        test_data = {
-            "user": {
-                "profile": "value"
-            }
-        }
-        
+        test_data = {"user": {"profile": "value"}}
+
         result = extract_nested_value(test_data, "user.missing.key", "default")
         assert result == "default"
 
@@ -120,7 +118,7 @@ class TestExtractNestedValue:
     def test_extract_nested_value_single_level(self):
         """Test extracting single level value."""
         test_data = {"key": "value"}
-        
+
         result = extract_nested_value(test_data, "key")
         assert result == "value"
 
@@ -132,7 +130,7 @@ class TestSafeFloatConversion:
         """Test conversion of valid numbers."""
         assert safe_float_conversion(42) == 42.0
         assert safe_float_conversion(3.14) == 3.14
-        assert safe_float_conversion(Decimal('2.5')) == 2.5
+        assert safe_float_conversion(Decimal("2.5")) == 2.5
         assert safe_float_conversion("1.23") == 1.23
 
     def test_safe_float_conversion_with_invalid_values(self):
@@ -153,19 +151,19 @@ class TestSafeDecimalConversion:
 
     def test_safe_decimal_conversion_with_valid_numbers(self):
         """Test conversion of valid numbers."""
-        assert safe_decimal_conversion(42) == Decimal('42')
-        assert safe_decimal_conversion(3.14) == Decimal('3.14')
-        assert safe_decimal_conversion("2.5") == Decimal('2.5')
+        assert safe_decimal_conversion(42) == Decimal("42")
+        assert safe_decimal_conversion(3.14) == Decimal("3.14")
+        assert safe_decimal_conversion("2.5") == Decimal("2.5")
 
     def test_safe_decimal_conversion_with_invalid_values(self):
         """Test conversion of invalid values."""
-        assert safe_decimal_conversion("not_a_number") == Decimal('0.0')
-        assert safe_decimal_conversion(None) == Decimal('0.0')
-        assert safe_decimal_conversion([]) == Decimal('0.0')
+        assert safe_decimal_conversion("not_a_number") == Decimal("0.0")
+        assert safe_decimal_conversion(None) == Decimal("0.0")
+        assert safe_decimal_conversion([]) == Decimal("0.0")
 
     def test_safe_decimal_conversion_with_custom_default(self):
         """Test conversion with custom default."""
-        default = Decimal('99.9')
+        default = Decimal("99.9")
         assert safe_decimal_conversion("invalid", default) == default
 
 
@@ -179,11 +177,11 @@ class TestNormalizePriceData:
             "high": "105.2",
             "low": "99.8",
             "close": "103.1",
-            "volume": "1500.0"
+            "volume": "1500.0",
         }
-        
+
         result = normalize_price_data(price_data)
-        
+
         assert result["open"] == 100.5
         assert result["high"] == 105.2
         assert result["low"] == 99.8
@@ -197,11 +195,11 @@ class TestNormalizePriceData:
             "highPrice": "105.2",
             "lowPrice": "99.8",
             "price": "103.1",
-            "vol": "1500.0"
+            "vol": "1500.0",
         }
-        
+
         result = normalize_price_data(price_data)
-        
+
         assert result["open"] == 100.5
         assert result["high"] == 105.2
         assert result["low"] == 99.8
@@ -215,9 +213,9 @@ class TestNormalizePriceData:
             "high": "105.2"
             # Missing other fields
         }
-        
+
         result = normalize_price_data(price_data)
-        
+
         assert result["open"] == 100.5
         assert result["high"] == 105.2
         assert result["low"] == 0.0
@@ -232,7 +230,7 @@ class TestIsValidPrice:
         """Test validation of valid prices."""
         assert is_valid_price(100.5) is True
         assert is_valid_price("99.99") is True
-        assert is_valid_price(Decimal('50.25')) is True
+        assert is_valid_price(Decimal("50.25")) is True
 
     def test_is_valid_price_with_invalid_prices(self):
         """Test validation of invalid prices."""
@@ -259,7 +257,7 @@ class TestCalculatePercentageChange:
         """Test percentage change with zero old value."""
         result = calculate_percentage_change(0.0, 50.0)
         assert result == 100.0
-        
+
         result = calculate_percentage_change(0.0, 0.0)
         assert result == 0.0
 
@@ -271,7 +269,7 @@ class TestValidateRequiredFields:
         """Test validation when all fields are present."""
         data = {"name": "John", "age": 30, "email": "john@example.com"}
         required = ["name", "age", "email"]
-        
+
         result = validate_required_fields(data, required)
         assert result == []
 
@@ -279,7 +277,7 @@ class TestValidateRequiredFields:
         """Test validation when some fields are missing."""
         data = {"name": "John", "age": 30}
         required = ["name", "age", "email", "phone"]
-        
+
         result = validate_required_fields(data, required)
         assert "email" in result
         assert "phone" in result
@@ -289,7 +287,7 @@ class TestValidateRequiredFields:
         """Test validation with None values."""
         data = {"name": "John", "age": None, "email": ""}
         required = ["name", "age", "email"]
-        
+
         result = validate_required_fields(data, required)
         assert "age" in result
         assert len(result) == 1  # email is empty string, not None

@@ -5,13 +5,13 @@ Implements different trading strategies: Support/Resistance, EMA Crossover, and 
 """
 
 from .base_strategy import BaseStrategy
-from .support_resistance import SupportResistanceStrategy
-from .ema_crossover import EMACrossoverStrategy
 from .combined import CombinedStrategy
+from .ema_crossover import EMACrossoverStrategy
+from .support_resistance import SupportResistanceStrategy
 
 __all__ = [
     "BaseStrategy",
-    "SupportResistanceStrategy", 
+    "SupportResistanceStrategy",
     "EMACrossoverStrategy",
-    "CombinedStrategy"
+    "CombinedStrategy",
 ]

@@ -5,7 +5,7 @@ Contains fundamental components like configuration, models, events, and exceptio
 """
 
 from .config import settings
-from .models import *
 from .exceptions import *
+from .models import *
 
 __all__ = ["settings"]
