@@ -80,12 +80,20 @@ class OHLCV(BaseModelWithTimestamp):
     close: float = Field(..., description="Closing price")
     volume: float = Field(..., description="Trading volume")
 
-    @field_validator("open", "high", "low", "close", "volume")
+    @field_validator("open", "high", "low", "close")
     @classmethod
-    def validate_positive_values(cls, v):
-        """Validate that all values are positive."""
+    def validate_positive_prices(cls, v):
+        """Validate that price values are positive."""
         if v <= 0:
-            raise ValueError("OHLCV values must be positive")
+            raise ValueError("OHLCV price values must be positive")
+        return v
+    
+    @field_validator("volume")
+    @classmethod
+    def validate_volume(cls, v):
+        """Validate volume (allow zero for low-activity periods)."""
+        if v < 0:
+            raise ValueError("Volume cannot be negative")
         return v
 
 

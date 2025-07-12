@@ -330,25 +330,44 @@ class TechnicalIndicators:
         current_volume = volumes[-1]
 
         # Calculate average volume (last 20 periods or available data)
+        # Filter out zero volumes for more meaningful average
         lookback = min(TradingConstants.VOLUME_LOOKBACK_PERIOD, len(volumes))
         recent_volumes = volumes[-lookback:]
-        average_volume = sum(recent_volumes) / len(recent_volumes)
+        non_zero_volumes = [v for v in recent_volumes if v > 0]
+        
+        if non_zero_volumes:
+            average_volume = sum(non_zero_volumes) / len(non_zero_volumes)
+        else:
+            # Fallback: use all volumes if all are zero
+            average_volume = sum(recent_volumes) / len(recent_volumes) if recent_volumes else 1.0
 
-        # Volume ratio
-        volume_ratio = current_volume / average_volume if average_volume > 0 else 1.0
+        # Volume ratio (handle zero current volume)
+        if current_volume > 0 and average_volume > 0:
+            volume_ratio = current_volume / average_volume
+        elif current_volume == 0 and average_volume > 0:
+            volume_ratio = 0.1  # Treat zero volume as very low activity
+        else:
+            volume_ratio = 1.0  # Neutral when both are zero or average is zero
 
-        # Calculate 20-period SMA for enhanced strategy
+        # Calculate 20-period SMA for enhanced strategy (filter out zeros)
         volume_sma_20_periods = min(20, len(volumes))
         volume_sma_20_data = volumes[-volume_sma_20_periods:]
-        volume_sma_20 = (
-            sum(volume_sma_20_data) / len(volume_sma_20_data)
-            if volume_sma_20_data
-            else 0
-        )
+        non_zero_sma_data = [v for v in volume_sma_20_data if v > 0]
+        
+        if non_zero_sma_data:
+            volume_sma_20 = sum(non_zero_sma_data) / len(non_zero_sma_data)
+        else:
+            # Fallback: use all data if all are zero
+            volume_sma_20 = sum(volume_sma_20_data) / len(volume_sma_20_data) if volume_sma_20_data else 1.0
 
         # Enhanced volume confirmation (110% of 20-period SMA)
-        volume_vs_sma_20 = current_volume / volume_sma_20 if volume_sma_20 > 0 else 1.0
-        volume_confirmation_110pct = current_volume >= (volume_sma_20 * 1.1)
+        if volume_sma_20 > 0:
+            volume_vs_sma_20 = current_volume / volume_sma_20
+            volume_confirmation_110pct = current_volume >= (volume_sma_20 * 1.1)
+        else:
+            # When SMA is zero, can't confirm volume, so assume neutral
+            volume_vs_sma_20 = 1.0
+            volume_confirmation_110pct = False
 
         # Volume trend
         if len(volumes) >= 3:
