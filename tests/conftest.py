@@ -4,18 +4,26 @@ Pytest configuration and fixtures for TradeBuddy tests.
 Provides common test fixtures and configuration for all test modules.
 """
 
-import pytest
 import asyncio
 import os
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock
-from typing import Dict, Any
+
+import pytest
 
 from src.core.config import Settings
 from src.core.models import (
-    OHLCV, MarketData, TradingSignal, SessionConfig,
-    Symbol, TimeFrame, StrategyType, SignalAction, SignalStrength
+    OHLCV,
+    MarketData,
+    SessionConfig,
+    SignalAction,
+    SignalStrength,
+    StrategyType,
+    Symbol,
+    TimeFrame,
+    TradingSignal,
 )
 
 
@@ -40,7 +48,7 @@ def test_settings():
         default_timeframe="1h",
         default_strategy="combined",
         cli_refresh_rate=0.1,  # Fast refresh for tests
-        debug=True
+        debug=True,
     )
 
 
@@ -53,7 +61,7 @@ def sample_ohlcv():
         low=Decimal("49500.00"),
         close=Decimal("50500.00"),
         volume=Decimal("1000.50"),
-        timestamp=datetime(2024, 1, 1, 12, 0, 0)
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
     )
 
 
@@ -64,7 +72,7 @@ def sample_market_data(sample_ohlcv):
         symbol=Symbol.BTCUSDT,
         timeframe=TimeFrame.ONE_HOUR,
         ohlcv=sample_ohlcv,
-        timestamp=datetime(2024, 1, 1, 12, 0, 0)
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
     )
 
 
@@ -83,7 +91,7 @@ def sample_trading_signal():
         reasoning="Strong support level with volume confirmation",
         risk_reward_ratio=Decimal("2.0"),
         position_size_pct=Decimal("3.0"),
-        timestamp=datetime(2024, 1, 1, 12, 0, 0)
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
     )
 
 
@@ -98,7 +106,7 @@ def sample_session_config():
         take_profit_pct=Decimal("5.0"),
         position_size_pct=Decimal("2.0"),
         confidence_threshold=6,
-        max_signals_per_session=10
+        max_signals_per_session=10,
     )
 
 
@@ -106,7 +114,7 @@ def sample_session_config():
 def mock_delta_client():
     """Mock Delta Exchange client for testing."""
     client = AsyncMock()
-    
+
     # Mock market data response
     client.get_market_data.return_value = {
         "symbol": "BTCUSDT",
@@ -118,11 +126,11 @@ def mock_delta_client():
                 "high": 51000.0,
                 "low": 49500.0,
                 "close": 50500.0,
-                "volume": 1000.5
+                "volume": 1000.5,
             }
-        ]
+        ],
     }
-    
+
     # Mock historical data response
     client.get_historical_data.return_value = {
         "symbol": "BTCUSDT",
@@ -134,12 +142,12 @@ def mock_delta_client():
                 "high": 51000.0 + i * 10,
                 "low": 49500.0 + i * 10,
                 "close": 50500.0 + i * 10,
-                "volume": 1000.5 + i
+                "volume": 1000.5 + i,
             }
             for i in range(24)  # 24 hours of data
-        ]
+        ],
     }
-    
+
     return client
 
 
@@ -147,7 +155,7 @@ def mock_delta_client():
 def mock_ollama_client():
     """Mock Ollama client for testing."""
     client = AsyncMock()
-    
+
     # Mock analysis response
     client.generate_analysis.return_value = {
         "signal": "BUY",
@@ -157,16 +165,16 @@ def mock_ollama_client():
         "stop_loss": 49500.0,
         "take_profit": 52500.0,
         "risk_reward_ratio": 2.0,
-        "position_size_pct": 3.0
+        "position_size_pct": 3.0,
     }
-    
+
     # Mock health check
     client.health_check.return_value = {
         "status": "healthy",
         "model": "test-model",
-        "available_models": ["test-model", "qwen2.5:14b"]
+        "available_models": ["test-model", "qwen2.5:14b"],
     }
-    
+
     return client
 
 
@@ -174,12 +182,12 @@ def mock_ollama_client():
 def mock_websocket_client():
     """Mock WebSocket client for testing."""
     client = AsyncMock()
-    
+
     # Mock connection
     client.connect.return_value = True
     client.disconnect.return_value = True
     client.is_connected.return_value = True
-    
+
     # Mock message stream
     async def mock_message_stream():
         for i in range(5):  # Simulate 5 messages
@@ -187,11 +195,11 @@ def mock_websocket_client():
                 "type": "price_update",
                 "symbol": "BTCUSDT",
                 "price": 50500.0 + i * 10,
-                "timestamp": f"2024-01-01T12:0{i}:00Z"
+                "timestamp": f"2024-01-01T12:0{i}:00Z",
             }
-    
+
     client.message_stream.return_value = mock_message_stream()
-    
+
     return client
 
 
@@ -199,12 +207,12 @@ def mock_websocket_client():
 def mock_rate_limiter():
     """Mock rate limiter for testing."""
     limiter = AsyncMock()
-    
+
     # Mock acquire method
     limiter.acquire.return_value = True
     limiter.can_proceed.return_value = True
     limiter.get_wait_time.return_value = 0.0
-    
+
     return limiter
 
 
@@ -217,12 +225,9 @@ def sample_api_response():
             "symbol": "BTCUSDT",
             "price": 50500.0,
             "volume": 1000.5,
-            "timestamp": "2024-01-01T12:00:00Z"
+            "timestamp": "2024-01-01T12:00:00Z",
         },
-        "metadata": {
-            "request_id": "test-123",
-            "timestamp": "2024-01-01T12:00:00Z"
-        }
+        "metadata": {"request_id": "test-123", "timestamp": "2024-01-01T12:00:00Z"},
     }
 
 
@@ -230,7 +235,7 @@ def sample_api_response():
 def mock_environment_validator():
     """Mock environment validator for testing."""
     validator = AsyncMock()
-    
+
     # Mock successful validation
     validator.validate_environment.return_value = {
         "is_valid": True,
@@ -240,11 +245,11 @@ def mock_environment_validator():
             "packages": {"missing": []},
             "external_services": {
                 "ollama": {"status": "Connected"},
-                "delta_exchange": {"status": "Connected"}
-            }
-        }
+                "delta_exchange": {"status": "Connected"},
+            },
+        },
     }
-    
+
     return validator
 
 
@@ -253,20 +258,24 @@ def clean_environment():
     """Clean environment variables for testing."""
     # Store original environment
     original_env = os.environ.copy()
-    
+
     # Clear test-related environment variables
     test_vars = [
-        "PYTHON_ENV", "LOG_LEVEL", "DEBUG",
-        "DELTA_EXCHANGE_API_URL", "OLLAMA_API_URL",
-        "OLLAMA_MODEL", "DEFAULT_SYMBOL"
+        "PYTHON_ENV",
+        "LOG_LEVEL",
+        "DEBUG",
+        "DELTA_EXCHANGE_API_URL",
+        "OLLAMA_API_URL",
+        "OLLAMA_MODEL",
+        "DEFAULT_SYMBOL",
     ]
-    
+
     for var in test_vars:
         if var in os.environ:
             del os.environ[var]
-    
+
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
@@ -295,7 +304,7 @@ def historical_price_data():
             "high": 51000.0 + (day * 100),
             "low": 49500.0 + (day * 100),
             "close": 50500.0 + (day * 100),
-            "volume": 1000.0 + (day * 10)
+            "volume": 1000.0 + (day * 10),
         }
         for day in range(1, 31)  # 30 days of data
     ]
@@ -310,20 +319,20 @@ def strategy_test_cases():
             "market_data": {
                 "price": 50000.0,
                 "support_level": 49900.0,
-                "volume": 1500.0
+                "volume": 1500.0,
             },
             "expected_signal": "BUY",
-            "expected_confidence": 8
+            "expected_confidence": 8,
         },
         {
             "name": "resistance_rejection",
             "market_data": {
                 "price": 51000.0,
                 "resistance_level": 51100.0,
-                "volume": 1800.0
+                "volume": 1800.0,
             },
             "expected_signal": "SELL",
-            "expected_confidence": 7
+            "expected_confidence": 7,
         },
         {
             "name": "golden_cross",
@@ -331,48 +340,50 @@ def strategy_test_cases():
                 "price": 50500.0,
                 "ema_9": 50450.0,
                 "ema_15": 50400.0,
-                "volume": 1200.0
+                "volume": 1200.0,
             },
             "expected_signal": "BUY",
-            "expected_confidence": 7
-        }
+            "expected_confidence": 7,
+        },
     ]
 
 
 # Parametrize fixtures
-@pytest.fixture(params=[
-    StrategyType.SUPPORT_RESISTANCE,
-    StrategyType.EMA_CROSSOVER,
-    StrategyType.COMBINED
-])
+@pytest.fixture(
+    params=[
+        StrategyType.SUPPORT_RESISTANCE,
+        StrategyType.EMA_CROSSOVER,
+        StrategyType.COMBINED,
+    ]
+)
 def strategy_type(request):
     """Parametrized strategy type fixture."""
     return request.param
 
 
-@pytest.fixture(params=[
-    Symbol.BTCUSDT,
-    Symbol.ETHUSDT,
-    Symbol.SOLUSDT
-])
+@pytest.fixture(params=[Symbol.BTCUSDT, Symbol.ETHUSDT, Symbol.SOLUSDT])
 def symbol(request):
     """Parametrized symbol fixture."""
     return request.param
 
 
-@pytest.fixture(params=[
-    TimeFrame.ONE_MINUTE,
-    TimeFrame.FIVE_MINUTES,
-    TimeFrame.ONE_HOUR,
-    TimeFrame.ONE_DAY
-])
+@pytest.fixture(
+    params=[
+        TimeFrame.ONE_MINUTE,
+        TimeFrame.FIVE_MINUTES,
+        TimeFrame.ONE_HOUR,
+        TimeFrame.ONE_DAY,
+    ]
+)
 def timeframe(request):
     """Parametrized timeframe fixture."""
     return request.param
 
 
 # Helper functions
-def create_mock_response(status_code: int = 200, data: Dict[str, Any] = None) -> MagicMock:
+def create_mock_response(
+    status_code: int = 200, data: Dict[str, Any] = None
+) -> MagicMock:
     """Create a mock HTTP response."""
     mock_response = MagicMock()
     mock_response.status_code = status_code
@@ -387,9 +398,13 @@ def assert_signal_valid(signal: TradingSignal):
     assert signal.confidence >= 1 and signal.confidence <= 10
     assert signal.entry_price > 0
     assert signal.action in [SignalAction.BUY, SignalAction.SELL, SignalAction.NEUTRAL]
-    assert signal.strength in [SignalStrength.WEAK, SignalStrength.MODERATE, SignalStrength.STRONG]
+    assert signal.strength in [
+        SignalStrength.WEAK,
+        SignalStrength.MODERATE,
+        SignalStrength.STRONG,
+    ]
     assert len(signal.reasoning) > 0
-    
+
     if signal.stop_loss:
         assert signal.stop_loss > 0
     if signal.take_profit:

@@ -21,6 +21,7 @@ TradeBuddy is a **production-ready** AI-powered trading signal analysis system t
 ## Development Principles
 
 - **Always test the functionality and not the implementation**
+- **Avoid over-engineering**
 
 ## Available Operation Modes
 
