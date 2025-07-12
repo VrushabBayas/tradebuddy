@@ -365,7 +365,7 @@ class CLIDisplays:
             # Add timestamp
             candle_table.add_row(
                 "Candle Time", 
-                latest_candle.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')
+                latest_candle.timestamp.strftime('%Y-%m-%d %I:%M %p UTC')
             )
             
             # Determine basic candle type
