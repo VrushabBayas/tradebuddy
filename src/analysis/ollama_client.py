@@ -8,6 +8,7 @@ trading signal generation based on technical analysis data.
 import asyncio
 import re
 import time
+import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 
@@ -106,7 +107,10 @@ class OllamaClient:
                 timeout=timeout,
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent": "TradeBuddy/0.1.0"
+                    "User-Agent": "TradeBuddy/0.1.0",
+                    # Anti-caching headers for AI requests
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache"
                 }
             )
             
@@ -152,12 +156,22 @@ class OllamaClient:
         
         url = f"{self.base_url}{endpoint}"
         
+        # Add request uniqueness to prevent any AI response caching
+        request_id = str(uuid.uuid4())[:8]
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        # Inject uniqueness into the prompt
+        if "prompt" in payload:
+            payload["prompt"] += f"\n\n[Request ID: {request_id}, Timestamp: {timestamp}]"
+        
         try:
             logger.debug(
                 "Making Ollama API request",
                 url=url,
                 model=payload.get("model"),
-                prompt_length=len(payload.get("prompt", ""))
+                prompt_length=len(payload.get("prompt", "")),
+                request_id=request_id,
+                anti_cache_enabled=True
             )
             
             start_time = time.time()

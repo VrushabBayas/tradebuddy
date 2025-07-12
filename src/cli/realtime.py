@@ -61,6 +61,11 @@ class RealTimeAnalyzer:
         self.analysis_count = 0
         self.config: Optional[RealTimeConfig] = None
         
+        # Buffer management for monitoring mode
+        self.monitoring_buffers = {}
+        self.signal_history = {}
+        self.last_buffer_refresh = {}
+        
         logger.info("Real-time analyzer initialized")
     
     async def run_session(self) -> None:
@@ -655,6 +660,9 @@ class RealTimeAnalyzer:
     async def analyze_symbol_for_monitoring(self, symbol: Symbol, config: MonitoringConfig, strategy_instance):
         """Analyze a single symbol during monitoring."""
         try:
+            # Check if buffer needs refresh (every 10 minutes)
+            await self._refresh_buffer_if_needed(symbol, config)
+            
             # Get latest market data for this symbol
             latest_data = await self.delta_client.get_market_data(
                 symbol=symbol.value,
@@ -666,6 +674,11 @@ class RealTimeAnalyzer:
             buffer = self.monitoring_buffers[symbol]
             for ohlcv in latest_data.ohlcv_data[-2:]:  # Last 2 candles
                 buffer.append(ohlcv)
+            
+            # Validate buffer data freshness
+            if buffer and self._is_buffer_stale(buffer, symbol, config):
+                self.console.print(f"🔄 {symbol.value}: Refreshing stale buffer data", style="yellow")
+                await self._force_buffer_refresh(symbol, config)
             
             # Run analysis if we have enough data
             if len(buffer) >= 20:
@@ -783,3 +796,75 @@ class RealTimeAnalyzer:
         
         self.console.print(summary_table)
         self.console.print("="*60, style="cyan")
+    
+    async def _refresh_buffer_if_needed(self, symbol: Symbol, config: MonitoringConfig) -> None:
+        """Check if buffer needs periodic refresh and refresh if needed."""
+        current_time = datetime.now()
+        last_refresh = self.last_buffer_refresh.get(symbol, datetime.min)
+        
+        # Refresh buffer every 10 minutes to ensure data freshness
+        refresh_interval_minutes = 10
+        
+        if (current_time - last_refresh).total_seconds() / 60 >= refresh_interval_minutes:
+            self.console.print(f"🔄 {symbol.value}: Periodic buffer refresh", style="cyan")
+            await self._force_buffer_refresh(symbol, config)
+            self.last_buffer_refresh[symbol] = current_time
+    
+    def _is_buffer_stale(self, buffer: deque, symbol: Symbol, config: MonitoringConfig) -> bool:
+        """Check if buffer data is stale based on timestamps."""
+        if not buffer:
+            return True
+        
+        current_time = datetime.now(timezone.utc)
+        latest_candle = buffer[-1]
+        
+        # Calculate maximum allowed age based on timeframe
+        if config.timeframe.value.endswith('m'):
+            max_age_minutes = int(config.timeframe.value[:-1]) * 3  # 3x timeframe
+        elif config.timeframe.value.endswith('h'):
+            max_age_minutes = int(config.timeframe.value[:-1]) * 60 * 3  # 3x timeframe in minutes
+        else:
+            max_age_minutes = 60  # Default 1 hour
+        
+        age_minutes = (current_time - latest_candle.timestamp).total_seconds() / 60
+        
+        is_stale = age_minutes > max_age_minutes
+        
+        if is_stale:
+            logger.warning(
+                "Buffer data is stale",
+                symbol=symbol.value,
+                age_minutes=age_minutes,
+                max_age_minutes=max_age_minutes
+            )
+        
+        return is_stale
+    
+    async def _force_buffer_refresh(self, symbol: Symbol, config: MonitoringConfig) -> None:
+        """Force complete refresh of buffer with fresh market data."""
+        try:
+            # Clear existing buffer
+            if symbol in self.monitoring_buffers:
+                self.monitoring_buffers[symbol].clear()
+            
+            # Get fresh historical data
+            fresh_data = await self.delta_client.get_market_data(
+                symbol=symbol.value,
+                timeframe=config.timeframe.value,
+                limit=config.historical_candles
+            )
+            
+            # Rebuild buffer with fresh data
+            buffer = self.monitoring_buffers[symbol]
+            for ohlcv in fresh_data.ohlcv_data:
+                buffer.append(ohlcv)
+            
+            logger.info(
+                "Buffer refreshed with fresh data",
+                symbol=symbol.value,
+                candles_loaded=len(fresh_data.ohlcv_data),
+                latest_timestamp=fresh_data.ohlcv_data[-1].timestamp.isoformat() if fresh_data.ohlcv_data else None
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to refresh buffer for {symbol.value}", error=str(e))
