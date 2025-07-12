@@ -201,12 +201,6 @@ class EMACrossoverStrategy(BaseStrategy):
             price_above_ema9 = current_price > ema_9
             price_above_ema15 = current_price > ema_15
 
-            # Enhanced Strategy Filters - Calculate 50 EMA for trend filter
-            ema_50_values = self.technical_indicators.calculate_ema(
-                market_data.ohlcv_data, 50
-            )
-            ema_50 = ema_50_values[-1] if ema_50_values else current_price
-            price_above_ema50 = current_price > ema_50
 
             # RSI Filter
             rsi_values = analysis.get("rsi_values", [])
@@ -225,16 +219,45 @@ class EMACrossoverStrategy(BaseStrategy):
             )
             current_atr = atr_values[-1] if atr_values else 0
 
-            # Candlestick Confirmation
+            # Advanced Candlestick Pattern Analysis
             candlestick_analysis = (
                 self.technical_indicators.analyze_candlestick_confirmation(
                     market_data.ohlcv_data
                 )
             )
-            candlestick_confirmation = candlestick_analysis.get(
-                "confirmation", "neutral"
-            )
+            
+            # Get advanced pattern data
+            candlestick_confirmation = candlestick_analysis.get("confirmation", "neutral")
             candlestick_strength = candlestick_analysis.get("strength", "weak")
+            pattern_strength_score = candlestick_analysis.get("pattern_strength_score", 3)
+            signal_direction = candlestick_analysis.get("signal_direction", "neutral")
+            patterns_detected = candlestick_analysis.get("patterns_detected", [])
+            trend_context = candlestick_analysis.get("trend_context", "sideways")
+            
+            # Pattern-based signal enhancement
+            pattern_bonus = 0
+            pattern_volume_confluence = False
+            
+            # Strong bearish patterns (Bearish Marabozu, Shooting Star)
+            if any(pattern in patterns_detected for pattern in ["bearish_marabozu", "shooting_star"]):
+                if signal_direction == "strong_bearish" and volume_confirmation_110pct:
+                    pattern_bonus = 2  # Strong bearish + volume = high bonus
+                    pattern_volume_confluence = True
+                elif signal_direction == "strong_bearish":
+                    pattern_bonus = 1  # Strong bearish pattern alone
+                    
+            # Strong bullish patterns (Bullish Marabozu)  
+            elif any(pattern in patterns_detected for pattern in ["bullish_marabozu"]):
+                if signal_direction == "strong_bullish" and volume_confirmation_110pct:
+                    pattern_bonus = 2  # Strong bullish + volume = high bonus
+                    pattern_volume_confluence = True
+                elif signal_direction == "strong_bullish":
+                    pattern_bonus = 1  # Strong bullish pattern alone
+                    
+            # Moderate patterns with volume
+            elif signal_direction in ["bullish", "bearish"] and volume_confirmation_110pct:
+                pattern_bonus = 1  # Moderate pattern + volume
+                pattern_volume_confluence = True
 
             # Determine trend strength based on EMA alignment
             if price_above_ema9 and price_above_ema15 and is_golden_cross:
@@ -248,21 +271,15 @@ class EMACrossoverStrategy(BaseStrategy):
             else:
                 trend_alignment = "mixed"
 
-            # Enhanced Signal Validation
+            # Enhanced Signal Validation (Less Restrictive)
             long_signal_valid = (
-                is_golden_cross
-                and price_above_ema9
-                and price_above_ema15
-                and current_price > ema_9
-                and current_price > ema_15  # Close above both EMAs
+                is_golden_cross  # Primary condition: 9 EMA > 15 EMA
+                and current_price > ema_15  # Price above slower EMA (key level)
             )
 
             short_signal_valid = (
-                not is_golden_cross
-                and not price_above_ema9
-                and not price_above_ema15
-                and current_price < ema_9
-                and current_price < ema_15  # Close below both EMAs
+                not is_golden_cross  # Primary condition: 9 EMA < 15 EMA
+                and current_price < ema_15  # Price below slower EMA (key level)
             )
 
             # Optional Filters (configurable) - check session config for EMA settings
@@ -270,41 +287,54 @@ class EMACrossoverStrategy(BaseStrategy):
             if hasattr(ema_config, "ema_config") and ema_config.ema_config:
                 config = ema_config.ema_config
                 enable_rsi = config.enable_rsi_filter
-                enable_ema50 = config.enable_ema50_filter
                 enable_volume = config.enable_volume_filter
                 enable_candlestick = config.enable_candlestick_filter
             else:
                 # Default configuration (as per strategy document)
                 enable_rsi = True
-                enable_ema50 = False  # As requested - optional by default
                 enable_volume = True
                 enable_candlestick = True
 
+            # Enhanced filters with pattern-based validation
             enhanced_long_filters = {
-                "rsi_filter": rsi_bullish if enable_rsi else True,  # RSI > 50
-                "ema50_filter": price_above_ema50
-                if enable_ema50
-                else True,  # Price > 50 EMA
-                "volume_filter": volume_confirmation_110pct
+                "rsi_filter": (current_rsi < 70) if enable_rsi else True,  # Not overbought
+                "volume_filter": (volume_ratio > 1.0)  # Any above-average volume
                 if enable_volume
-                else True,  # Volume >= 110% of 20-period SMA
-                "candlestick_filter": (candlestick_confirmation == "bullish")
-                if enable_candlestick
                 else True,
+                "candlestick_filter": (
+                    candlestick_confirmation == "bullish" or 
+                    signal_direction in ["strong_bullish", "bullish"]
+                ) if enable_candlestick else True,
+                "pattern_filter": (
+                    signal_direction in ["strong_bullish", "bullish"] or
+                    any(pattern in patterns_detected for pattern in ["bullish_marabozu", "hammer"])
+                ) if enable_candlestick else True,
             }
 
             enhanced_short_filters = {
-                "rsi_filter": rsi_bearish if enable_rsi else True,  # RSI < 50
-                "ema50_filter": (not price_above_ema50)
-                if enable_ema50
-                else True,  # Price < 50 EMA
-                "volume_filter": volume_confirmation_110pct
+                "rsi_filter": (current_rsi > 30) if enable_rsi else True,  # Not oversold
+                "volume_filter": (volume_ratio > 1.0)  # Any above-average volume
                 if enable_volume
-                else True,  # Volume >= 110% of 20-period SMA
-                "candlestick_filter": (candlestick_confirmation == "bearish")
-                if enable_candlestick
                 else True,
+                "candlestick_filter": (
+                    candlestick_confirmation == "bearish" or
+                    signal_direction in ["strong_bearish", "bearish"]
+                ) if enable_candlestick else True,
+                "pattern_filter": (
+                    signal_direction in ["strong_bearish", "bearish"] or
+                    any(pattern in patterns_detected for pattern in ["bearish_marabozu", "shooting_star"])
+                ) if enable_candlestick else True,
             }
+            
+            # Special cases for extreme RSI conditions (oversold/overbought reversals)
+            rsi_oversold_reversal = current_rsi < 30 and is_golden_cross  # Oversold + bullish cross
+            rsi_overbought_reversal = current_rsi > 70 and not is_golden_cross  # Overbought + bearish cross
+            
+            # Allow signals in extreme RSI conditions if EMA supports the direction
+            if rsi_oversold_reversal:
+                enhanced_long_filters["rsi_filter"] = True  # Override RSI filter for oversold reversal
+            if rsi_overbought_reversal:
+                enhanced_short_filters["rsi_filter"] = True  # Override RSI filter for overbought reversal
 
             # Volume confirmation for crossover (legacy)
             volume_ratio = volume_analysis.get("volume_ratio", 1.0)
@@ -312,8 +342,8 @@ class EMACrossoverStrategy(BaseStrategy):
                 volume_ratio > TradingConstants.VOLUME_CONFIRMATION_THRESHOLD
             )
 
-            # Calculate enhanced momentum score
-            momentum_score = self._calculate_enhanced_momentum_score(
+            # Calculate enhanced momentum score with pattern bonus
+            base_momentum_score = self._calculate_enhanced_momentum_score(
                 crossover_strength,
                 separation_pct,
                 volume_ratio,
@@ -322,18 +352,21 @@ class EMACrossoverStrategy(BaseStrategy):
                 candlestick_strength,
                 current_atr,
             )
+            
+            # Apply pattern bonus to momentum score
+            momentum_score = min(10, base_momentum_score + pattern_bonus)
 
-            # Add EMA specific context with enhanced filters
+            # Add EMA specific context with enhanced pattern analysis
             analysis["ema_context"] = {
                 "ema_separation_pct": separation_pct,
                 "price_above_ema9": price_above_ema9,
                 "price_above_ema15": price_above_ema15,
-                "price_above_ema50": price_above_ema50,
-                "ema_50": ema_50,
                 "trend_alignment": trend_alignment,
                 "volume_confirmed": volume_confirmed,
                 "volume_confirmation_110pct": volume_confirmation_110pct,
                 "momentum_score": momentum_score,
+                "base_momentum_score": base_momentum_score,
+                "pattern_bonus": pattern_bonus,
                 "crossover_type": "golden_cross" if is_golden_cross else "death_cross",
                 "signal_quality": self._assess_signal_quality(
                     crossover_strength, volume_ratio, separation_pct
@@ -344,6 +377,13 @@ class EMACrossoverStrategy(BaseStrategy):
                 "current_atr": current_atr,
                 "candlestick_confirmation": candlestick_confirmation,
                 "candlestick_strength": candlestick_strength,
+                # Enhanced pattern analysis
+                "pattern_strength_score": pattern_strength_score,
+                "signal_direction": signal_direction,
+                "patterns_detected": patterns_detected,
+                "trend_context": trend_context,
+                "pattern_volume_confluence": pattern_volume_confluence,
+                # Signal validation
                 "long_signal_valid": long_signal_valid,
                 "short_signal_valid": short_signal_valid,
                 "enhanced_long_filters": enhanced_long_filters,
@@ -352,7 +392,6 @@ class EMACrossoverStrategy(BaseStrategy):
                 "all_short_filters_passed": all(enhanced_short_filters.values()),
                 "filter_config": {
                     "rsi_enabled": enable_rsi,
-                    "ema50_enabled": enable_ema50,
                     "volume_enabled": enable_volume,
                     "candlestick_enabled": enable_candlestick,
                 },
@@ -368,9 +407,16 @@ class EMACrossoverStrategy(BaseStrategy):
                 separation_pct=separation_pct,
                 trend_alignment=trend_alignment,
                 momentum_score=momentum_score,
+                base_momentum_score=base_momentum_score,
+                pattern_bonus=pattern_bonus,
                 current_rsi=current_rsi,
                 current_atr=current_atr,
                 candlestick_confirmation=candlestick_confirmation,
+                pattern_strength_score=pattern_strength_score,
+                signal_direction=signal_direction,
+                patterns_detected=patterns_detected,
+                trend_context=trend_context,
+                pattern_volume_confluence=pattern_volume_confluence,
                 all_long_filters_passed=all(enhanced_long_filters.values()),
                 all_short_filters_passed=all(enhanced_short_filters.values()),
             )
@@ -583,9 +629,6 @@ class EMACrossoverStrategy(BaseStrategy):
 
         lines.append(f"EMA Separation: {ema_context.get('ema_separation_pct', 0):.2f}%")
         lines.append(
-            f"50 EMA: ${ema_context.get('ema_50', 0):,.2f} (Price {'Above' if ema_context.get('price_above_ema50') else 'Below'})"
-        )
-        lines.append(
             f"Trend Alignment: {ema_context.get('trend_alignment', 'unknown').replace('_', ' ').title()}"
         )
         lines.append(
@@ -598,27 +641,50 @@ class EMACrossoverStrategy(BaseStrategy):
         lines.append(
             f"Enhanced Volume (110%): {'Yes' if ema_context.get('volume_confirmation_110pct') else 'No'}"
         )
-        lines.append(
-            f"Candlestick: {ema_context.get('candlestick_confirmation', 'neutral').title()} ({ema_context.get('candlestick_strength', 'weak').title()})"
-        )
-        lines.append(
-            f"Enhanced Momentum Score: {ema_context.get('momentum_score', 0)}/10"
-        )
+        # Enhanced candlestick pattern information
+        pattern_info = []
+        patterns_detected = ema_context.get('patterns_detected', [])
+        signal_direction = ema_context.get('signal_direction', 'neutral')
+        pattern_strength_score = ema_context.get('pattern_strength_score', 3)
+        pattern_volume_confluence = ema_context.get('pattern_volume_confluence', False)
+        
+        if patterns_detected:
+            pattern_names = [p.replace('_', ' ').title() for p in patterns_detected]
+            pattern_info.append(f"Patterns: {', '.join(pattern_names)}")
+        
+        pattern_info.append(f"Pattern Strength: {pattern_strength_score}/10")
+        pattern_info.append(f"Signal Direction: {signal_direction.replace('_', ' ').title()}")
+        
+        if pattern_volume_confluence:
+            pattern_info.append("Pattern-Volume Confluence: Yes")
+            
+        lines.append(f"Candlestick: {' | '.join(pattern_info)}")
+        # Enhanced momentum score with pattern breakdown
+        momentum_score = ema_context.get('momentum_score', 0)
+        base_momentum_score = ema_context.get('base_momentum_score', 0)
+        pattern_bonus = ema_context.get('pattern_bonus', 0)
+        
+        if pattern_bonus > 0:
+            lines.append(
+                f"Enhanced Momentum Score: {momentum_score}/10 (Base: {base_momentum_score} + Pattern Bonus: +{pattern_bonus})"
+            )
+        else:
+            lines.append(f"Enhanced Momentum Score: {momentum_score}/10")
         lines.append(
             f"Signal Quality: {ema_context.get('signal_quality', 'unknown').title()}"
         )
 
-        # Add filter status
+        # Add enhanced filter status with pattern filters
         if ema_context.get("enhanced_long_filters"):
             long_filters = ema_context["enhanced_long_filters"]
             lines.append(
-                f"Long Filters: RSI({long_filters.get('rsi_filter', False)}), EMA50({long_filters.get('ema50_filter', False)}), Volume({long_filters.get('volume_filter', False)}), Candle({long_filters.get('candlestick_filter', False)})"
+                f"Long Filters: RSI({long_filters.get('rsi_filter', False)}), Volume({long_filters.get('volume_filter', False)}), Candle({long_filters.get('candlestick_filter', False)}), Pattern({long_filters.get('pattern_filter', False)})"
             )
 
         if ema_context.get("enhanced_short_filters"):
             short_filters = ema_context["enhanced_short_filters"]
             lines.append(
-                f"Short Filters: RSI({short_filters.get('rsi_filter', False)}), EMA50({short_filters.get('ema50_filter', False)}), Volume({short_filters.get('volume_filter', False)}), Candle({short_filters.get('candlestick_filter', False)})"
+                f"Short Filters: RSI({short_filters.get('rsi_filter', False)}), Volume({short_filters.get('volume_filter', False)}), Candle({short_filters.get('candlestick_filter', False)}), Pattern({short_filters.get('pattern_filter', False)})"
             )
 
         # ATR-based stop loss suggestion
@@ -692,6 +758,13 @@ class EMACrossoverStrategy(BaseStrategy):
         confidence = 5
         reasoning = "No clear signal"
 
+        # Extract pattern data for enhanced confidence scoring
+        pattern_strength_score = ema_context.get("pattern_strength_score", 3)
+        signal_direction = ema_context.get("signal_direction", "neutral")
+        patterns_detected = ema_context.get("patterns_detected", [])
+        pattern_volume_confluence = ema_context.get("pattern_volume_confluence", False)
+        pattern_bonus = ema_context.get("pattern_bonus", 0)
+
         # Golden Cross - BUY Signal
         if is_golden_cross and long_signal_valid:
             signal_action = SignalAction.BUY
@@ -699,13 +772,33 @@ class EMACrossoverStrategy(BaseStrategy):
             # Base confidence from crossover strength
             confidence = max(6, min(10, 5 + crossover_strength))
             
+            # Apply pattern enhancement for bullish signals
+            if signal_direction in ["strong_bullish", "bullish"]:
+                if any(pattern in patterns_detected for pattern in ["bullish_marabozu"]):
+                    confidence = min(10, confidence + 2)  # Strong bullish pattern bonus
+                    reasoning_suffix = " with Bullish Marabozu pattern"
+                elif pattern_volume_confluence:
+                    confidence = min(10, confidence + 1)  # Pattern + volume bonus
+                    reasoning_suffix = " with bullish pattern and volume confirmation"
+                elif pattern_bonus > 0:
+                    confidence = min(10, confidence + 1)  # General pattern bonus
+                    reasoning_suffix = " with bullish pattern confirmation"
+                else:
+                    reasoning_suffix = ""
+            else:
+                reasoning_suffix = ""
+            
             # Boost confidence if all filters pass
             if all_long_filters_passed:
                 confidence = min(10, confidence + 1)
             
-            # Determine reasoning based on filters
-            if all_long_filters_passed:
+            # Enhanced reasoning with pattern information
+            if all_long_filters_passed and reasoning_suffix:
+                reasoning = f"Strong EMA golden cross with all filters confirmed{reasoning_suffix} (EMA strength: {crossover_strength}/10, Pattern strength: {pattern_strength_score}/10)"
+            elif all_long_filters_passed:
                 reasoning = f"Strong EMA golden cross with all filters confirmed (strength: {crossover_strength}/10)"
+            elif reasoning_suffix:
+                reasoning = f"EMA golden cross detected{reasoning_suffix} (EMA strength: {crossover_strength}/10, Pattern strength: {pattern_strength_score}/10)"
             else:
                 reasoning = f"EMA golden cross detected (strength: {crossover_strength}/10)"
                 
@@ -716,18 +809,80 @@ class EMACrossoverStrategy(BaseStrategy):
             # Base confidence from crossover strength
             confidence = max(6, min(10, 5 + crossover_strength))
             
+            # Apply pattern enhancement for bearish signals
+            if signal_direction in ["strong_bearish", "bearish"]:
+                if any(pattern in patterns_detected for pattern in ["bearish_marabozu", "shooting_star"]):
+                    confidence = min(10, confidence + 2)  # Strong bearish pattern bonus
+                    pattern_name = "Bearish Marabozu" if "bearish_marabozu" in patterns_detected else "Shooting Star"
+                    reasoning_suffix = f" with {pattern_name} pattern"
+                elif pattern_volume_confluence:
+                    confidence = min(10, confidence + 1)  # Pattern + volume bonus
+                    reasoning_suffix = " with bearish pattern and volume confirmation"
+                elif pattern_bonus > 0:
+                    confidence = min(10, confidence + 1)  # General pattern bonus
+                    reasoning_suffix = " with bearish pattern confirmation"
+                else:
+                    reasoning_suffix = ""
+            else:
+                reasoning_suffix = ""
+            
             # Boost confidence if all filters pass
             if all_short_filters_passed:
                 confidence = min(10, confidence + 1)
             
-            # Determine reasoning based on filters
-            if all_short_filters_passed:
+            # Enhanced reasoning with pattern information
+            if all_short_filters_passed and reasoning_suffix:
+                reasoning = f"Strong EMA death cross with all filters confirmed{reasoning_suffix} (EMA strength: {crossover_strength}/10, Pattern strength: {pattern_strength_score}/10)"
+            elif all_short_filters_passed:
                 reasoning = f"Strong EMA death cross with all filters confirmed (strength: {crossover_strength}/10)"
+            elif reasoning_suffix:
+                reasoning = f"EMA death cross detected{reasoning_suffix} (EMA strength: {crossover_strength}/10, Pattern strength: {pattern_strength_score}/10)"
             else:
                 reasoning = f"EMA death cross detected (strength: {crossover_strength}/10)"
 
         # Create signal if action is not neutral
         if signal_action != SignalAction.NEUTRAL:
+            # Create candlestick formation object
+            candle_formation = self.technical_indicators.create_candlestick_formation(market_data.ohlcv_data)
+            
+            # Add volume confirmation to formation if available
+            if candle_formation:
+                candle_formation.volume_confirmation = pattern_volume_confluence
+            
+            # Generate enhanced pattern context with educational reasoning
+            pattern_context = None
+            if candle_formation:
+                # Get trend context from EMA alignment
+                trend_context = "neutral"
+                if ema_9 > ema_15 and market_data.current_price > ema_9:
+                    trend_context = "uptrend"
+                elif ema_9 < ema_15 and market_data.current_price < ema_9:
+                    trend_context = "downtrend"
+                
+                # Generate detailed pattern reasoning
+                pattern_reasoning = self.technical_indicators.generate_pattern_reasoning(
+                    formation=candle_formation,
+                    current_price=market_data.current_price,
+                    trend_context=trend_context
+                )
+                
+                # Combine basic context with detailed reasoning
+                if patterns_detected and pattern_volume_confluence:
+                    pattern_context = f"Strong {signal_direction} pattern with volume confirmation. {pattern_reasoning}"
+                elif patterns_detected:
+                    pattern_context = f"Pattern detected: {', '.join(patterns_detected)}. {pattern_reasoning}"
+                else:
+                    pattern_context = pattern_reasoning
+            elif patterns_detected:
+                # Fallback for basic pattern context
+                if pattern_volume_confluence:
+                    pattern_context = f"Strong {signal_direction} pattern with volume confirmation"
+                else:
+                    pattern_context = f"Pattern detected: {', '.join(patterns_detected)}"
+            
+            # Get current candle timestamp
+            candle_timestamp = market_data.ohlcv_data[-1].timestamp if market_data.ohlcv_data else None
+            
             signal = TradingSignal(
                 symbol=market_data.symbol,
                 strategy=self.strategy_type,
@@ -736,6 +891,9 @@ class EMACrossoverStrategy(BaseStrategy):
                 confidence=confidence,
                 entry_price=market_data.current_price,
                 reasoning=reasoning,
+                candle_timestamp=candle_timestamp,
+                candle_formation=candle_formation,
+                pattern_context=pattern_context,
             )
             signals.append(signal)
 
@@ -745,6 +903,11 @@ class EMACrossoverStrategy(BaseStrategy):
                 confidence=confidence,
                 crossover_type="golden_cross" if is_golden_cross else "death_cross",
                 filters_passed=all_long_filters_passed if signal_action == SignalAction.BUY else all_short_filters_passed,
+                pattern_strength_score=pattern_strength_score,
+                signal_direction=signal_direction,
+                patterns_detected=patterns_detected,
+                pattern_bonus=pattern_bonus,
+                pattern_volume_confluence=pattern_volume_confluence,
             )
 
         # Create analysis result

@@ -216,19 +216,19 @@ class CLIDisplays:
             self.console.print("⚠️ No trading signals generated", style="yellow")
             return
 
-        # Create signals table
+        # Create signals table with enhanced columns
         signals_table = Table(title="Generated Signals")
         signals_table.add_column("Signal", style="cyan", width=8)
         signals_table.add_column("Action", style="white", width=8)
         signals_table.add_column("Confidence", style="white", width=10)
+        signals_table.add_column("Candle Time", style="white", width=17)
+        signals_table.add_column("Formation", style="yellow", width=25)
         signals_table.add_column("Entry Price", style="white", width=12)
-        signals_table.add_column("Stop Loss", style="red", width=12)
-        signals_table.add_column("Take Profit", style="green", width=12)
         signals_table.add_column("Risk/Reward", style="white", width=10)
 
         for i, signal in enumerate(analysis_result.signals, 1):
             # Calculate stop loss and take profit
-            entry_price = signal.entry_price
+            entry_price = float(signal.entry_price)
 
             # Handle action display (Pydantic converts enums to strings)
             action_name = str(signal.action)
@@ -249,13 +249,18 @@ class CLIDisplays:
             # Style based on action
             action_style = "green" if action_upper == "BUY" else "red"
 
+            # Get formation display with styling
+            formation_display = signal.formation_display
+            if signal.candle_formation and signal.candle_formation.is_strong_pattern:
+                formation_display = f"[bold]{formation_display}[/bold]"
+            
             signals_table.add_row(
                 f"#{i}",
                 f"[{action_style}]{action_upper}[/{action_style}]",
                 f"{signal.confidence}/10",
+                signal.candle_time_display,
+                formation_display,
                 f"${entry_price:,.2f}",
-                f"${stop_loss:,.2f}",
-                f"${take_profit:,.2f}",
                 f"{risk_reward:.2f}:1",
             )
 
@@ -269,12 +274,47 @@ class CLIDisplays:
             primary_action_upper = primary_action.upper()
             primary_style = "green" if primary_action_upper == "BUY" else "red"
 
+            # Build enhanced signal display content
+            signal_content = (
+                f"[bold]Primary Signal: [{primary_style}]{primary_action_upper}[/{primary_style}][/bold]\n"
+                f"Confidence: {primary.confidence}/10\n"
+                f"Entry Price: ${float(primary.entry_price):,.2f}\n"
+            )
+            
+            # Add candle timing information
+            if primary.candle_timestamp:
+                signal_content += f"Candle Time: {primary.candle_time_display}\n"
+            
+            # Add candlestick formation details
+            if primary.candle_formation:
+                formation = primary.candle_formation
+                strength_indicator = "🔥" if formation.is_strong_pattern else "📈"
+                signal_content += (
+                    f"Formation: {strength_indicator} {formation.pattern_display_name} "
+                    f"({formation.strength}/10)\n"
+                    f"Pattern Type: {formation.pattern_type.title()}\n"
+                    f"Description: {formation.visual_description}\n"
+                )
+                
+                # Add volume confirmation if available
+                if formation.volume_confirmation:
+                    signal_content += "Volume Confirmation: ✅ Confirmed\n"
+                else:
+                    signal_content += "Volume Confirmation: ⚠️ Not Confirmed\n"
+            else:
+                signal_content += "Formation: Standard Candle\n"
+            
+            # Add pattern context if available
+            if primary.pattern_context:
+                signal_content += f"Context: {primary.pattern_context}\n"
+            
+            # Add reasoning (use enhanced reasoning if available)
+            reasoning_text = primary.enhanced_reasoning if hasattr(primary, 'enhanced_reasoning') else primary.reasoning
+            signal_content += f"Reasoning: {reasoning_text}"
+
             self.console.print(
                 Panel(
-                    f"[bold]Primary Signal: [{primary_style}]{primary_action_upper}[/{primary_style}][/bold]\n"
-                    f"Confidence: {primary.confidence}/10\n"
-                    f"Entry Price: ${float(primary.entry_price):,.2f}\n"
-                    f"Reasoning: {primary.reasoning}",
+                    signal_content,
                     title="🎯 Primary Signal",
                     style="yellow",
                 )

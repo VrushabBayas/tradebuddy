@@ -142,6 +142,35 @@ class EMACrossover(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
+class CandlestickFormation(BaseModel):
+    """Candlestick pattern formation details."""
+    
+    pattern_name: str = Field(..., description="Name of the detected pattern")
+    pattern_type: str = Field(..., description="Type category (bullish/bearish/neutral)")
+    strength: int = Field(..., ge=1, le=10, description="Pattern strength score (1-10)")
+    signal_direction: str = Field(..., description="Signal direction (strong_bullish, bullish, neutral, bearish, strong_bearish)")
+    
+    # Visual characteristics
+    body_ratio: float = Field(..., description="Body size ratio to total candle range")
+    upper_shadow_ratio: float = Field(..., description="Upper shadow ratio to body size")
+    lower_shadow_ratio: float = Field(..., description="Lower shadow ratio to body size")
+    
+    # Descriptive information
+    visual_description: str = Field(..., description="Human-readable candle description")
+    trend_context: str = Field(..., description="Trend context (uptrend/downtrend/sideways)")
+    volume_confirmation: bool = Field(default=False, description="Whether volume confirms the pattern")
+    
+    @property
+    def is_strong_pattern(self) -> bool:
+        """Check if this is a strong pattern (strength >= 8)."""
+        return self.strength >= 8
+    
+    @property
+    def pattern_display_name(self) -> str:
+        """Get formatted pattern name for display."""
+        return self.pattern_name.replace('_', ' ').title()
+
+
 class TradingSignal(BaseModelWithTimestamp):
     """Trading signal with entry/exit levels."""
 
@@ -169,6 +198,11 @@ class TradingSignal(BaseModelWithTimestamp):
     position_size_pct: Optional[Decimal] = Field(
         None, description="Recommended position size %"
     )
+    
+    # Enhanced context information
+    candle_timestamp: Optional[datetime] = Field(None, description="Timestamp of the candle that triggered this signal")
+    candle_formation: Optional[CandlestickFormation] = Field(None, description="Candlestick formation details")
+    pattern_context: Optional[str] = Field(None, description="Additional pattern context and confluence")
 
     @field_validator("confidence")
     @classmethod
@@ -182,6 +216,43 @@ class TradingSignal(BaseModelWithTimestamp):
     def is_actionable(self) -> bool:
         """Check if signal is actionable (confidence >= 6)."""
         return self.confidence >= 6
+    
+    @property
+    def candle_time_display(self) -> str:
+        """Get formatted candle timestamp for display."""
+        if self.candle_timestamp:
+            return self.candle_timestamp.strftime('%Y-%m-%d %H:%M')
+        return "N/A"
+    
+    @property
+    def formation_display(self) -> str:
+        """Get formatted candlestick formation for display."""
+        if self.candle_formation:
+            return f"{self.candle_formation.pattern_display_name} ({self.candle_formation.strength}/10)"
+        return "Standard Candle"
+    
+    @property
+    def enhanced_reasoning(self) -> str:
+        """Get enhanced reasoning with detailed pattern context."""
+        base_reasoning = self.reasoning
+        
+        # Add candlestick formation context
+        if self.candle_formation:
+            if self.candle_formation.is_strong_pattern:
+                pattern_info = f" [Strong Pattern: {self.candle_formation.visual_description}]"
+            else:
+                pattern_info = f" [Pattern: {self.candle_formation.visual_description}]"
+            base_reasoning += pattern_info
+        
+        # Add detailed pattern context if available
+        if self.pattern_context:
+            # If pattern context contains detailed reasoning, prioritize it
+            if len(self.pattern_context) > 50:  # Likely contains detailed reasoning
+                base_reasoning += f" [Educational Context: {self.pattern_context}]"
+            else:
+                base_reasoning += f" [Context: {self.pattern_context}]"
+        
+        return base_reasoning
 
 
 class AnalysisResult(BaseModelWithTimestamp):

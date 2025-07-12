@@ -393,6 +393,20 @@ class RealTimeAnalyzer:
             )
             self.console.print(f"   Confidence: {signal.confidence}/10")
             self.console.print(f"   Entry: ${signal.entry_price:,.2f}")
+            
+            # Add candle timing information
+            if signal.candle_timestamp:
+                self.console.print(f"   Candle Time: {signal.candle_time_display}")
+            
+            # Add candlestick formation details in compact format
+            if signal.candle_formation:
+                formation = signal.candle_formation
+                strength_indicator = "🔥" if formation.is_strong_pattern else "📈"
+                self.console.print(f"   Formation: {strength_indicator} {formation.pattern_display_name} ({formation.strength}/10)")
+                volume_status = "✅" if formation.volume_confirmation else "⚠️"
+                self.console.print(f"   Volume: {volume_status} {'Confirmed' if formation.volume_confirmation else 'Not Confirmed'}")
+            else:
+                self.console.print("   Formation: Standard Candle")
         else:
             self.console.print("🔍 No primary signal", style="yellow")
 
@@ -842,15 +856,40 @@ class RealTimeAnalyzer:
         """Display detailed signal information in monitoring mode."""
         action_style = "green" if str(signal.action).upper() == "BUY" else "red"
 
+        # Build signal content with enhanced details
+        signal_content = (
+            f"🚨 [bold]{symbol.value} SIGNAL ALERT[/bold]\n\n"
+            f"Action: [{action_style}]{signal.action}[/{action_style}]\n"
+            f"Confidence: {signal.confidence}/10\n"
+            f"Current Price: ${current_price:,.2f}\n"
+            f"Entry Price: ${signal.entry_price:,.2f}\n"
+            f"Time: {datetime.now().strftime('%H:%M:%S')}\n"
+        )
+        
+        # Add candle timing information
+        if signal.candle_timestamp:
+            signal_content += f"Candle Time: {signal.candle_time_display}\n"
+        
+        # Add candlestick formation details
+        if signal.candle_formation:
+            formation = signal.candle_formation
+            strength_indicator = "🔥" if formation.is_strong_pattern else "📈"
+            signal_content += (
+                f"Formation: {strength_indicator} {formation.pattern_display_name} "
+                f"({formation.strength}/10)\n"
+                f"Pattern: {formation.pattern_type.title()}\n"
+            )
+            # Add volume confirmation status
+            volume_status = "✅ Confirmed" if formation.volume_confirmation else "⚠️ Not Confirmed"
+            signal_content += f"Volume: {volume_status}\n"
+        else:
+            signal_content += "Formation: Standard Candle\n"
+        
+        signal_content += f"\nReasoning: {signal.reasoning[:100]}..."
+
         self.console.print(
             Panel(
-                f"🚨 [bold]{symbol.value} SIGNAL ALERT[/bold]\n\n"
-                f"Action: [{action_style}]{signal.action}[/{action_style}]\n"
-                f"Confidence: {signal.confidence}/10\n"
-                f"Current Price: ${current_price:,.2f}\n"
-                f"Entry Price: ${signal.entry_price:,.2f}\n"
-                f"Time: {datetime.now().strftime('%H:%M:%S')}\n\n"
-                f"Reasoning: {signal.reasoning[:100]}...",
+                signal_content,
                 title=f"🎯 {symbol.value} Alert",
                 style="yellow",
             )

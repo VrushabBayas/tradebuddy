@@ -621,6 +621,51 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                     else "AI analysis provided"
                 )
 
+                # Create candlestick formation and context
+                candle_formation = None
+                pattern_context = None
+                candle_timestamp = None
+                
+                if market_data.ohlcv_data:
+                    candle_timestamp = market_data.ohlcv_data[-1].timestamp
+                    try:
+                        # Create TechnicalIndicators instance for pattern analysis
+                        from src.analysis.indicators import TechnicalIndicators
+                        tech_indicators = TechnicalIndicators()
+                        candle_formation = tech_indicators.create_candlestick_formation(market_data.ohlcv_data)
+                        
+                        # Generate enhanced pattern context with detailed reasoning
+                        if candle_formation:
+                            # Determine trend context (simplified for AI signals)
+                            trend_context = "neutral"
+                            if technical_analysis:
+                                ema_data = technical_analysis.get("ema_crossover")
+                                if ema_data:
+                                    if hasattr(ema_data, "is_golden_cross"):
+                                        trend_context = "uptrend" if ema_data.is_golden_cross else "downtrend"
+                                    elif ema_data.get("is_golden_cross"):
+                                        trend_context = "uptrend" if ema_data["is_golden_cross"] else "downtrend"
+                            
+                            # Generate detailed pattern reasoning
+                            pattern_reasoning = tech_indicators.generate_pattern_reasoning(
+                                formation=candle_formation,
+                                current_price=market_data.current_price,
+                                trend_context=trend_context
+                            )
+                            
+                            # Extract pattern context from technical analysis if available
+                            if technical_analysis and "candlestick_analysis" in technical_analysis:
+                                candlestick_data = technical_analysis["candlestick_analysis"]
+                                patterns = candlestick_data.get("patterns_detected", [])
+                                if patterns:
+                                    pattern_context = f"AI analysis with patterns: {', '.join(patterns)}. {pattern_reasoning}"
+                                else:
+                                    pattern_context = f"AI analysis: {pattern_reasoning}"
+                            else:
+                                pattern_context = pattern_reasoning
+                    except Exception as e:
+                        logger.debug("Could not create candlestick formation for AI signal", error=str(e))
+
                 # Create trading signal
                 signal = TradingSignal(
                     symbol=market_data.symbol,
@@ -634,6 +679,9 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                     reasoning=reasoning,
                     risk_reward_ratio=risk_reward_ratio,
                     position_size_pct=position_size_pct,
+                    candle_timestamp=candle_timestamp,
+                    candle_formation=candle_formation,
+                    pattern_context=pattern_context,
                 )
 
                 signals.append(signal)
@@ -648,6 +696,9 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
 
             # If no valid signal found, create a default WAIT signal
             if not signals:
+                # Get candle timestamp for default signal
+                candle_timestamp = market_data.ohlcv_data[-1].timestamp if market_data.ohlcv_data else None
+                
                 default_signal = TradingSignal(
                     symbol=market_data.symbol,
                     strategy=strategy,
@@ -656,6 +707,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                     confidence=1,
                     entry_price=market_data.current_price,
                     reasoning="Unable to parse clear signal from AI response",
+                    candle_timestamp=candle_timestamp,
                 )
                 signals.append(default_signal)
 
@@ -665,6 +717,8 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
             logger.error("Error parsing trading signals", error=str(e))
 
             # Create fallback signal
+            candle_timestamp = market_data.ohlcv_data[-1].timestamp if market_data.ohlcv_data else None
+            
             fallback_signal = TradingSignal(
                 symbol=market_data.symbol,
                 strategy=strategy,
@@ -673,6 +727,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                 confidence=1,
                 entry_price=market_data.current_price,
                 reasoning=f"Signal parsing error: {str(e)}",
+                candle_timestamp=candle_timestamp,
             )
             signals.append(fallback_signal)
 

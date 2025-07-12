@@ -582,9 +582,192 @@ class TechnicalIndicators:
 
         return fib_levels
 
+    def detect_advanced_candlestick_patterns(self, data: List[OHLCV]) -> Dict[str, Any]:
+        """
+        Detect advanced candlestick patterns with precise criteria.
+
+        Args:
+            data: List of OHLCV data points
+
+        Returns:
+            Dictionary with advanced pattern analysis
+        """
+        self._validate_data(data, min_periods=3)
+
+        logger.debug("Detecting advanced candlestick patterns", data_points=len(data))
+
+        current = data[-1]
+        previous = data[-2] if len(data) >= 2 else current
+
+        # Basic candle properties
+        is_bullish_candle = current.close > current.open
+        is_bearish_candle = current.close < current.open
+        
+        # Calculate precise measurements
+        body_size = abs(current.close - current.open)
+        candle_range = current.high - current.low
+        upper_shadow = current.high - max(current.open, current.close)
+        lower_shadow = min(current.open, current.close) - current.low
+        
+        # Avoid division by zero
+        body_ratio = body_size / candle_range if candle_range > 0 else 0
+        upper_shadow_ratio = upper_shadow / body_size if body_size > 0 else 0
+        lower_shadow_ratio = lower_shadow / body_size if body_size > 0 else 0
+        upper_shadow_pct = upper_shadow / candle_range if candle_range > 0 else 0
+        lower_shadow_pct = lower_shadow / candle_range if candle_range > 0 else 0
+
+        # Advanced pattern detection
+        patterns_detected = []
+        pattern_strength = 0  # 1-10 scale
+        pattern_type = "none"
+        signal_direction = "neutral"
+
+        # BEARISH MARABOZU - Most bearish pattern
+        if (is_bearish_candle and 
+            body_ratio >= 0.95 and  # Body is 95%+ of candle
+            upper_shadow_pct <= 0.02 and  # Upper shadow ≤2% of range
+            lower_shadow_pct <= 0.02):  # Lower shadow ≤2% of range
+            patterns_detected.append("bearish_marabozu")
+            pattern_strength = 10
+            pattern_type = "bearish_marabozu"
+            signal_direction = "strong_bearish"
+
+        # SHOOTING STAR - Second most bearish pattern  
+        elif (upper_shadow_ratio >= 2.0 and  # Upper shadow ≥2x body
+              lower_shadow_ratio <= 0.5 and  # Lower shadow ≤50% of body
+              body_ratio <= 0.3):  # Small body (≤30% of range)
+            patterns_detected.append("shooting_star")
+            pattern_strength = 9
+            pattern_type = "shooting_star"
+            signal_direction = "strong_bearish"
+
+        # BULLISH MARABOZU - Most bullish pattern
+        elif (is_bullish_candle and
+              body_ratio >= 0.95 and  # Body is 95%+ of candle  
+              upper_shadow_pct <= 0.02 and  # Upper shadow ≤2% of range
+              lower_shadow_pct <= 0.02):  # Lower shadow ≤2% of range
+            patterns_detected.append("bullish_marabozu")
+            pattern_strength = 10
+            pattern_type = "bullish_marabozu"
+            signal_direction = "strong_bullish"
+
+        # ENHANCED HAMMER - Bullish reversal at support
+        elif (lower_shadow_ratio >= 2.0 and  # Lower shadow ≥2x body
+              upper_shadow_ratio <= 0.5 and  # Upper shadow ≤50% of body
+              body_ratio <= 0.3):  # Small body
+            patterns_detected.append("hammer")
+            pattern_strength = 7
+            pattern_type = "hammer"
+            signal_direction = "bullish"
+
+        # ENHANCED DOJI - Indecision
+        elif body_ratio <= 0.05:  # Body ≤5% of range
+            patterns_detected.append("doji")
+            pattern_strength = 3
+            pattern_type = "doji"
+            signal_direction = "neutral"
+
+        # STRONG BULLISH CANDLE - Enhanced detection
+        elif (is_bullish_candle and body_ratio >= 0.7):
+            patterns_detected.append("strong_bullish")
+            pattern_strength = 8
+            pattern_type = "strong_bullish"
+            signal_direction = "bullish"
+
+        # STRONG BEARISH CANDLE - Enhanced detection  
+        elif (is_bearish_candle and body_ratio >= 0.7):
+            patterns_detected.append("strong_bearish")
+            pattern_strength = 8
+            pattern_type = "strong_bearish"
+            signal_direction = "bearish"
+
+        # MODERATE PATTERNS
+        elif is_bullish_candle and body_ratio >= 0.4:
+            patterns_detected.append("moderate_bullish")
+            pattern_strength = 5
+            pattern_type = "moderate_bullish"
+            signal_direction = "bullish"
+        elif is_bearish_candle and body_ratio >= 0.4:
+            patterns_detected.append("moderate_bearish")
+            pattern_strength = 5
+            pattern_type = "moderate_bearish"
+            signal_direction = "bearish"
+        else:
+            pattern_strength = 2
+            pattern_type = "indecisive"
+            signal_direction = "neutral"
+
+        # Calculate trend context for pattern validation
+        trend_context = self._analyze_trend_context(data)
+        
+        # Adjust pattern strength based on trend alignment
+        if signal_direction == "strong_bearish" and trend_context == "downtrend":
+            pattern_strength = min(10, pattern_strength + 1)  # Boost bearish patterns in downtrend
+        elif signal_direction == "strong_bullish" and trend_context == "uptrend":
+            pattern_strength = min(10, pattern_strength + 1)  # Boost bullish patterns in uptrend
+        elif signal_direction != "neutral" and trend_context == "sideways":
+            pattern_strength = max(1, pattern_strength - 1)  # Reduce strength in sideways markets
+
+        analysis = {
+            "patterns_detected": patterns_detected,
+            "primary_pattern": pattern_type,
+            "pattern_strength": pattern_strength,
+            "signal_direction": signal_direction,
+            "body_ratio": body_ratio,
+            "upper_shadow_ratio": upper_shadow_ratio,
+            "lower_shadow_ratio": lower_shadow_ratio,
+            "trend_context": trend_context,
+            "is_bullish": is_bullish_candle,
+            "is_bearish": is_bearish_candle,
+            "body_size": body_size,
+            "upper_shadow": upper_shadow,
+            "lower_shadow": lower_shadow,
+            "candle_range": candle_range,
+        }
+
+        logger.debug(
+            "Advanced pattern detection completed",
+            primary_pattern=pattern_type,
+            strength=pattern_strength,
+            signal=signal_direction,
+            trend_context=trend_context,
+        )
+        return analysis
+
+    def _analyze_trend_context(self, data: List[OHLCV]) -> str:
+        """
+        Analyze recent trend context for pattern validation.
+
+        Args:
+            data: List of OHLCV data points
+
+        Returns:
+            Trend context: 'uptrend', 'downtrend', or 'sideways'
+        """
+        if len(data) < 5:
+            return "sideways"
+
+        # Use last 5 closes to determine short-term trend
+        recent_closes = [candle.close for candle in data[-5:]]
+        
+        # Calculate trend slope using linear regression
+        x = np.arange(len(recent_closes))
+        slope = np.polyfit(x, recent_closes, 1)[0]
+        
+        # Calculate percentage change over period
+        price_change_pct = ((recent_closes[-1] - recent_closes[0]) / recent_closes[0]) * 100
+        
+        # Determine trend based on slope and price change
+        if slope > 0 and price_change_pct > 1.0:
+            return "uptrend"
+        elif slope < 0 and price_change_pct < -1.0:
+            return "downtrend"
+        else:
+            return "sideways"
+
     def analyze_candlestick_confirmation(self, data: List[OHLCV]) -> Dict[str, Any]:
         """
-        Analyze candlestick patterns for trend confirmation.
+        Analyze candlestick patterns for trend confirmation (backward compatibility).
 
         Args:
             data: List of OHLCV data points
@@ -596,63 +779,51 @@ class TechnicalIndicators:
 
         logger.debug("Analyzing candlestick patterns", data_points=len(data))
 
+        # Use advanced pattern detection
+        advanced_analysis = self.detect_advanced_candlestick_patterns(data)
+        
+        # Map to legacy format for backward compatibility
+        signal_direction = advanced_analysis["signal_direction"]
+        pattern_strength = advanced_analysis["pattern_strength"]
+        
+        # Map signal direction to confirmation
+        if signal_direction in ["strong_bullish", "bullish"]:
+            confirmation = "bullish"
+        elif signal_direction in ["strong_bearish", "bearish"]:
+            confirmation = "bearish"
+        else:
+            confirmation = "neutral"
+            
+        # Map pattern strength to legacy strength categories
+        if pattern_strength >= 8:
+            strength = "strong"
+        elif pattern_strength >= 5:
+            strength = "moderate"
+        else:
+            strength = "weak"
+
+        # Enhanced pattern detection for specific patterns
         current = data[-1]
-        previous = data[-2] if len(data) >= 2 else current
-
-        # Basic candle properties
-        is_bullish_candle = current.close > current.open
-        is_bearish_candle = current.close < current.open
-        is_doji = (
-            abs(current.close - current.open) / current.open < 0.001
-        )  # Less than 0.1% body
-
-        # Calculate body and shadow sizes
         body_size = abs(current.close - current.open)
-        candle_range = current.high - current.low
         upper_shadow = current.high - max(current.open, current.close)
         lower_shadow = min(current.open, current.close) - current.low
 
-        # Body-to-range ratio for candle strength
-        body_ratio = body_size / candle_range if candle_range > 0 else 0
-
-        # Determine confirmation strength
-        if is_doji:
-            confirmation = "neutral"
-            pattern = "doji"
-            strength = "weak"
-        elif is_bullish_candle and body_ratio > 0.6:
-            confirmation = "bullish"
-            pattern = "strong_bullish"
-            strength = "strong"
-        elif is_bullish_candle and body_ratio > 0.3:
-            confirmation = "bullish"
-            pattern = "moderate_bullish"
-            strength = "moderate"
-        elif is_bearish_candle and body_ratio > 0.6:
-            confirmation = "bearish"
-            pattern = "strong_bearish"
-            strength = "strong"
-        elif is_bearish_candle and body_ratio > 0.3:
-            confirmation = "bearish"
-            pattern = "moderate_bearish"
-            strength = "moderate"
-        else:
-            confirmation = "neutral"
-            pattern = "indecisive"
-            strength = "weak"
-
-        # Additional pattern recognition
-        is_hammer = (lower_shadow > body_size * 2) and (upper_shadow < body_size * 0.5)
-        is_shooting_star = (upper_shadow > body_size * 2) and (
-            lower_shadow < body_size * 0.5
-        )
+        # Check for specific patterns using advanced detection
+        is_hammer = "hammer" in advanced_analysis["patterns_detected"]
+        is_shooting_star = "shooting_star" in advanced_analysis["patterns_detected"]
+        is_doji = "doji" in advanced_analysis["patterns_detected"]
+        
+        # Enhanced engulfing pattern detection
         is_engulfing = False
-
         if len(data) >= 2:
+            previous = data[-2]
+            is_bullish_candle = current.close > current.open
+            is_bearish_candle = current.close < current.open
             prev_body_size = abs(previous.close - previous.open)
+            
             is_engulfing = (
                 body_size > prev_body_size * 1.1
-                and (  # Current body larger than previous
+                and (
                     (
                         is_bullish_candle
                         and previous.close < previous.open
@@ -668,13 +839,14 @@ class TechnicalIndicators:
                 )
             )
 
+        # Legacy format with enhanced data
         analysis = {
             "confirmation": confirmation,
-            "pattern": pattern,
+            "pattern": advanced_analysis["primary_pattern"],
             "strength": strength,
-            "body_ratio": body_ratio,
-            "is_bullish": is_bullish_candle,
-            "is_bearish": is_bearish_candle,
+            "body_ratio": advanced_analysis["body_ratio"],
+            "is_bullish": advanced_analysis["is_bullish"],
+            "is_bearish": advanced_analysis["is_bearish"],
             "is_doji": is_doji,
             "is_hammer": is_hammer,
             "is_shooting_star": is_shooting_star,
@@ -682,15 +854,19 @@ class TechnicalIndicators:
             "body_size": body_size,
             "upper_shadow": upper_shadow,
             "lower_shadow": lower_shadow,
+            # Enhanced fields
+            "pattern_strength_score": pattern_strength,
+            "signal_direction": signal_direction,
+            "patterns_detected": advanced_analysis["patterns_detected"],
+            "trend_context": advanced_analysis["trend_context"],
         }
 
         logger.debug(
             "Candlestick analysis completed",
-            **{
-                k: v
-                for k, v in analysis.items()
-                if k not in ["body_size", "upper_shadow", "lower_shadow"]
-            },
+            confirmation=confirmation,
+            pattern=advanced_analysis["primary_pattern"],
+            strength=strength,
+            pattern_strength_score=pattern_strength,
         )
         return analysis
 
@@ -796,3 +972,210 @@ class TechnicalIndicators:
         except Exception as e:
             logger.error("Error in comprehensive analysis", error=str(e))
             raise DataValidationError(f"Analysis failed: {str(e)}")
+    
+    def create_candlestick_formation(self, data: List[OHLCV]) -> Optional:
+        """
+        Create a CandlestickFormation object from the latest candle analysis.
+        
+        Args:
+            data: List of OHLCV data points
+            
+        Returns:
+            CandlestickFormation object or None if no clear pattern
+        """
+        try:
+            from src.core.models import CandlestickFormation
+            
+            # Get advanced pattern analysis
+            pattern_analysis = self.detect_advanced_candlestick_patterns(data)
+            
+            if not pattern_analysis or pattern_analysis.get("primary_pattern") == "none":
+                return None
+            
+            current = data[-1]
+            
+            # Generate visual description
+            visual_desc = self._generate_visual_description(
+                current, 
+                pattern_analysis["primary_pattern"],
+                pattern_analysis["body_ratio"],
+                pattern_analysis["upper_shadow_ratio"],
+                pattern_analysis["lower_shadow_ratio"]
+            )
+            
+            # Determine pattern type
+            signal_direction = pattern_analysis["signal_direction"]
+            if signal_direction in ["strong_bullish", "bullish"]:
+                pattern_type = "bullish"
+            elif signal_direction in ["strong_bearish", "bearish"]:
+                pattern_type = "bearish"
+            else:
+                pattern_type = "neutral"
+            
+            return CandlestickFormation(
+                pattern_name=pattern_analysis["primary_pattern"],
+                pattern_type=pattern_type,
+                strength=pattern_analysis["pattern_strength"],
+                signal_direction=signal_direction,
+                body_ratio=pattern_analysis["body_ratio"],
+                upper_shadow_ratio=pattern_analysis["upper_shadow_ratio"],
+                lower_shadow_ratio=pattern_analysis["lower_shadow_ratio"],
+                visual_description=visual_desc,
+                trend_context=pattern_analysis["trend_context"],
+                volume_confirmation=False  # Will be set by strategy
+            )
+            
+        except Exception as e:
+            logger.warning("Failed to create candlestick formation", error=str(e))
+            return None
+    
+    def _generate_visual_description(
+        self, 
+        candle: OHLCV, 
+        pattern_name: str, 
+        body_ratio: float,
+        upper_shadow_ratio: float,
+        lower_shadow_ratio: float
+    ) -> str:
+        """Generate human-readable visual description of candle."""
+        
+        # Determine candle color and size
+        is_bullish = candle.close > candle.open
+        color = "green" if is_bullish else "red"
+        
+        # Body size description
+        if body_ratio >= 0.8:
+            body_desc = "large"
+        elif body_ratio >= 0.5:
+            body_desc = "medium"
+        elif body_ratio >= 0.2:
+            body_desc = "small"
+        else:
+            body_desc = "tiny"
+        
+        # Shadow description
+        shadow_desc = ""
+        if upper_shadow_ratio >= 2.0:
+            shadow_desc += "long upper shadow"
+        elif upper_shadow_ratio >= 1.0:
+            shadow_desc += "medium upper shadow"
+        
+        if lower_shadow_ratio >= 2.0:
+            if shadow_desc:
+                shadow_desc += " and long lower shadow"
+            else:
+                shadow_desc += "long lower shadow"
+        elif lower_shadow_ratio >= 1.0:
+            if shadow_desc:
+                shadow_desc += " and medium lower shadow"
+            else:
+                shadow_desc += "medium lower shadow"
+        
+        if not shadow_desc:
+            shadow_desc = "minimal shadows"
+        
+        # Special pattern descriptions
+        pattern_descriptions = {
+            "bearish_marabozu": f"Strong {color} candle with virtually no shadows - maximum bearish pressure",
+            "bullish_marabozu": f"Strong {color} candle with virtually no shadows - maximum bullish pressure",
+            "shooting_star": f"Small body with long upper shadow - potential reversal signal",
+            "hammer": f"Small body with long lower shadow - potential reversal signal",
+            "doji": f"Very small body indicating market indecision",
+        }
+        
+        if pattern_name in pattern_descriptions:
+            return pattern_descriptions[pattern_name]
+        
+        # Default description
+        return f"{body_desc.title()} {color} body with {shadow_desc}"
+    
+    def generate_pattern_reasoning(
+        self, 
+        formation: "CandlestickFormation", 
+        current_price: float,
+        trend_context: str = "neutral"
+    ) -> str:
+        """
+        Generate detailed educational reasoning about the candlestick pattern.
+        
+        Args:
+            formation: CandlestickFormation object
+            current_price: Current market price
+            trend_context: Current trend context (uptrend/downtrend/sideways)
+            
+        Returns:
+            Detailed reasoning about the pattern's significance
+        """
+        pattern_reasoning = {
+            "bearish_marabozu": {
+                "description": "A Bearish Marabozu indicates maximum selling pressure with no buying support.",
+                "psychology": "Sellers controlled the entire session, opening at the high and closing at the low.",
+                "reliability": "High reliability pattern, especially effective in downtrends.",
+                "trading_context": "Strong continuation signal in downtrends, reversal signal after uptrends."
+            },
+            "bullish_marabozu": {
+                "description": "A Bullish Marabozu shows maximum buying pressure with no selling resistance.",
+                "psychology": "Buyers dominated completely, opening at the low and closing at the high.",
+                "reliability": "High reliability pattern, particularly strong in uptrends.",
+                "trading_context": "Strong continuation signal in uptrends, reversal signal after downtrends."
+            },
+            "shooting_star": {
+                "description": "A Shooting Star indicates potential trend reversal with failed upward attempt.",
+                "psychology": "Bulls pushed price higher but bears rejected the advance, closing near the open.",
+                "reliability": "Moderate reliability, requires confirmation from next candle.",
+                "trading_context": "Most effective at resistance levels or after strong uptrends."
+            },
+            "hammer": {
+                "description": "A Hammer suggests potential bullish reversal with strong support found.",
+                "psychology": "Bears drove price down but bulls regained control, closing near the high.",
+                "reliability": "Moderate to high reliability, especially at support levels.",
+                "trading_context": "Most effective after downtrends or at key support levels."
+            },
+            "doji": {
+                "description": "A Doji represents market indecision with equal buying and selling pressure.",
+                "psychology": "Neither bulls nor bears could gain control, suggesting potential reversal.",
+                "reliability": "Low to moderate reliability, heavily dependent on context.",
+                "trading_context": "Most significant after strong trends or at key support/resistance levels."
+            }
+        }
+        
+        pattern_name = formation.pattern_name
+        if pattern_name not in pattern_reasoning:
+            return f"Standard candle formation with {formation.pattern_type} bias."
+        
+        info = pattern_reasoning[pattern_name]
+        
+        # Build comprehensive reasoning
+        reasoning = f"{info['description']} "
+        reasoning += f"{info['psychology']} "
+        
+        # Add trend context
+        if trend_context == "uptrend":
+            if "reversal" in info['trading_context'] and "uptrend" in info['trading_context']:
+                reasoning += f"In the current uptrend, this pattern suggests potential bearish reversal. "
+            elif "continuation" in info['trading_context'] and "uptrend" in info['trading_context']:
+                reasoning += f"In the current uptrend, this pattern supports continued bullish momentum. "
+        elif trend_context == "downtrend":
+            if "reversal" in info['trading_context'] and "downtrend" in info['trading_context']:
+                reasoning += f"In the current downtrend, this pattern suggests potential bullish reversal. "
+            elif "continuation" in info['trading_context'] and "downtrend" in info['trading_context']:
+                reasoning += f"In the current downtrend, this pattern supports continued bearish momentum. "
+        
+        # Add reliability assessment
+        reasoning += f"Pattern reliability: {info['reliability']} "
+        
+        # Add strength-based context
+        if formation.strength >= 8:
+            reasoning += "This is a very strong pattern formation with clear defined characteristics."
+        elif formation.strength >= 6:
+            reasoning += "This is a moderate strength pattern with decent reliability."
+        else:
+            reasoning += "This is a weak pattern that should be confirmed with other indicators."
+        
+        # Add volume context if available
+        if formation.volume_confirmation:
+            reasoning += " Volume confirms the pattern, increasing its reliability."
+        else:
+            reasoning += " Volume does not confirm the pattern, reducing its reliability."
+        
+        return reasoning
