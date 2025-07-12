@@ -74,9 +74,9 @@ class TradingConstants:
     # Strategy Analysis Thresholds
     PRICE_TOLERANCE_PCT = 0.5  # 0.5% tolerance for price level comparisons
     SUPPORT_RESISTANCE_TOLERANCE_PCT = 0.5  # 0.5% tolerance for S/R levels
-    VOLUME_CONFIRMATION_THRESHOLD = 1.2  # 20% above average volume
-    STRONG_VOLUME_THRESHOLD = 1.3  # 30% above average for strong confirmation
-    VERY_STRONG_VOLUME_THRESHOLD = 1.5  # 50% above average for very strong confirmation
+    VOLUME_CONFIRMATION_THRESHOLD = 1.1  # 10% above average volume (reduced from 20%)
+    STRONG_VOLUME_THRESHOLD = 1.2  # 20% above average for strong confirmation (reduced from 30%)
+    VERY_STRONG_VOLUME_THRESHOLD = 1.3  # 30% above average for very strong confirmation (reduced from 50%)
 
     # EMA Analysis Constants
     EMA_SEPARATION_WEAK = 1.0  # 1% separation for weak signals

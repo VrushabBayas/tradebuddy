@@ -604,6 +604,9 @@ class BacktestReportGenerator:
             </div>
         </div>
 
+        <!-- Signal Quality Analysis -->
+        {{ signal_quality_section|safe }}
+
         <!-- Trade Log -->
         <div class="section">
             <h2>📋 Trade Log (Last 20 Trades)</h2>
@@ -679,6 +682,7 @@ class BacktestReportGenerator:
             'trade_distribution': charts.get('trade_distribution', ''),
             'performance_metrics': charts.get('performance_metrics', ''),
             'recent_trades': self._format_trades_for_template(result.trades[-20:] if result.trades else []),
+            'signal_quality_section': self._generate_signal_quality_section(result),
             'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         }
         
@@ -704,3 +708,144 @@ class BacktestReportGenerator:
             }
             formatted_trades.append(formatted_trade)
         return formatted_trades
+
+    def _generate_signal_quality_section(self, result: BacktestResult) -> str:
+        """Generate HTML section for signal quality analysis."""
+        if not result.signal_quality_metrics:
+            return ""
+        
+        signal_metrics = result.signal_quality_metrics
+        
+        # Create pattern performance table
+        pattern_table_rows = ""
+        for pattern, count in signal_metrics.get("pattern_signal_count", {}).items():
+            if count > 0:
+                win_rate = signal_metrics.get("pattern_win_rates", {}).get(pattern, 0) * 100
+                avg_return = signal_metrics.get("pattern_avg_returns", {}).get(pattern, 0)
+                confidence_accuracy = signal_metrics.get("pattern_confidence_accuracy", {}).get(pattern, 0) * 100
+                
+                pattern_display = pattern.replace('_', ' ').title()
+                pattern_table_rows += f"""
+                <tr>
+                    <td>{pattern_display}</td>
+                    <td>{count}</td>
+                    <td class="{'positive' if win_rate >= 50 else 'negative'}">{win_rate:.1f}%</td>
+                    <td class="{'positive' if avg_return > 0 else 'negative'}">{avg_return:.2f}%</td>
+                    <td>{confidence_accuracy:.1f}%</td>
+                </tr>
+                """
+        
+        # Create confidence calibration table
+        confidence_table_rows = ""
+        for bin_name, data in signal_metrics.get("confidence_bins", {}).items():
+            if data.get("count", 0) > 0:
+                actual_win_rate = (data.get("wins", 0) / data.get("count", 1)) * 100
+                avg_return = data.get("avg_return", 0)
+                count = data.get("count", 0)
+                
+                confidence_table_rows += f"""
+                <tr>
+                    <td>{bin_name}%</td>
+                    <td>{count}</td>
+                    <td class="{'positive' if actual_win_rate >= 50 else 'negative'}">{actual_win_rate:.1f}%</td>
+                    <td class="{'positive' if avg_return > 0 else 'negative'}">{avg_return:.2f}%</td>
+                </tr>
+                """
+        
+        # Create optimization recommendations
+        optimization_html = ""
+        if result.optimization_results:
+            optimization_html = """
+            <h3>🎯 Optimization Recommendations</h3>
+            <div class="metrics-grid">
+            """
+            
+            for opt_result in result.optimization_results:
+                if opt_result.get("improvement_pct", 0) > 2:  # Only show significant improvements
+                    improvement = opt_result.get("improvement_pct", 0)
+                    optimization_html += f"""
+                    <div class="metric-card">
+                        <p class="metric-value">+{improvement:.1f}%</p>
+                        <p class="metric-label">{opt_result.get("parameter", "Unknown").replace('_', ' ').title()}</p>
+                        <p style="font-size: 0.8em; color: #666;">
+                            Current: {opt_result.get("current_value", "N/A")}<br>
+                            Suggested: {opt_result.get("recommended", "N/A")}
+                        </p>
+                    </div>
+                    """
+            
+            optimization_html += "</div>"
+        
+        # Signal quality overview metrics
+        total_signals = signal_metrics.get("total_signals", 0)
+        win_rate = signal_metrics.get("win_rate", 0) * 100
+        avg_confidence = signal_metrics.get("avg_confidence", 0)
+        confidence_accuracy = signal_metrics.get("confidence_accuracy", 0) * 100
+        
+        signal_quality_html = f"""
+        <div class="section">
+            <h2>🎯 Signal Quality Analysis</h2>
+            
+            <!-- Overview Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <p class="metric-value">{total_signals}</p>
+                    <p class="metric-label">Total Signals</p>
+                </div>
+                <div class="metric-card">
+                    <p class="metric-value">{win_rate:.1f}%</p>
+                    <p class="metric-label">Signal Win Rate</p>
+                </div>
+                <div class="metric-card">
+                    <p class="metric-value">{avg_confidence:.1f}/10</p>
+                    <p class="metric-label">Avg Confidence</p>
+                </div>
+                <div class="metric-card">
+                    <p class="metric-value">{confidence_accuracy:.1f}%</p>
+                    <p class="metric-label">Confidence Accuracy</p>
+                </div>
+            </div>
+            
+            {optimization_html}
+            
+            <!-- Pattern Performance -->
+            {f'''
+            <h3>📊 Pattern Performance Analysis</h3>
+            <table class="trade-table">
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Signals</th>
+                        <th>Win Rate</th>
+                        <th>Avg Return</th>
+                        <th>Confidence Accuracy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {pattern_table_rows}
+                </tbody>
+            </table>
+            ''' if pattern_table_rows else ''}
+            
+            <!-- Confidence Calibration -->
+            {f'''
+            <h3>🎯 Confidence Calibration</h3>
+            <table class="trade-table">
+                <thead>
+                    <tr>
+                        <th>Confidence Range</th>
+                        <th>Signals</th>
+                        <th>Actual Win Rate</th>
+                        <th>Avg Return</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {confidence_table_rows}
+                </tbody>
+            </table>
+            ''' if confidence_table_rows else ''}
+            
+        </div>
+        """
+        
+        return signal_quality_html

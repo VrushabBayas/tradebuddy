@@ -24,6 +24,7 @@ from src.backtesting.models import (
     TradeStatus,
 )
 from src.backtesting.portfolio import Portfolio
+from src.backtesting.signal_quality import SignalQualityAnalyzer
 from src.core.exceptions import StrategyError, DataValidationError
 from src.core.models import (
     MarketData,
@@ -71,6 +72,10 @@ class BacktestEngine:
         self.all_signals_generated = 0
         self.signals_traded = 0
         self.benchmark_returns: List[float] = []
+        
+        # Signal quality analysis
+        self.signal_quality_analyzer = SignalQualityAnalyzer()
+        self.all_generated_signals: List = []
 
         logger.info(
             "Backtesting engine initialized",
@@ -125,7 +130,11 @@ class BacktestEngine:
             logger.info("Creating benchmark comparison")
             benchmark_comparison = self._create_benchmark_comparison()
 
-            # Phase 6: Compile final results
+            # Phase 6: Generate signal quality analysis
+            logger.info("Analyzing signal quality")
+            signal_quality_metrics = await self._analyze_signal_quality()
+
+            # Phase 7: Compile final results
             end_time = datetime.utcnow()
             execution_duration = (end_time - start_time).total_seconds()
 
@@ -142,6 +151,7 @@ class BacktestEngine:
                 initial_capital=self.config.initial_capital,
                 final_capital=self.portfolio.current_equity,
                 peak_capital=self.portfolio.peak_equity,
+                signal_quality_metrics=signal_quality_metrics.to_dict() if signal_quality_metrics else None,
                 total_signals_generated=self.all_signals_generated,
                 signals_traded=self.signals_traded,
                 signal_conversion_rate_pct=(
@@ -341,6 +351,9 @@ class BacktestEngine:
 
         # Track all signals generated
         self.all_signals_generated += len(analysis_result.signals)
+        
+        # Store signals for quality analysis
+        self.all_generated_signals.extend(analysis_result.signals)
 
         # Filter signals by confidence threshold
         valid_signals = [
@@ -680,3 +693,98 @@ class BacktestEngine:
             TimeFrame.ONE_DAY: 365,
         }
         return timeframe_map.get(self.config.timeframe, 8760)
+
+    async def _analyze_signal_quality(self):
+        """Analyze signal quality and generate optimization recommendations."""
+        try:
+            if not self.all_generated_signals or not self.portfolio.closed_trades:
+                logger.warning("Insufficient data for signal quality analysis")
+                return None
+
+            # Create a dummy BacktestResult for signal quality analysis
+            temp_result = BacktestResult(
+                config=self.config,
+                start_date=self.config.start_date,
+                end_date=self.config.end_date,
+                total_duration_days=self.config.days_back,
+                trades=self.portfolio.closed_trades,
+                equity_curve=self.portfolio.equity_history,
+                performance_metrics=PerformanceMetrics(
+                    total_return_pct=self.portfolio.total_return_pct,
+                    annual_return_pct=0.0,  # Will be calculated
+                    total_trades=len(self.portfolio.closed_trades),
+                    winning_trades=0,  # Will be calculated
+                    win_rate_pct=0.0,  # Will be calculated
+                    avg_win_pct=0.0,
+                    avg_loss_pct=0.0,
+                    profit_factor=0.0,
+                    max_drawdown_pct=0.0,
+                    sharpe_ratio=0.0,
+                    sortino_ratio=0.0,
+                    calmar_ratio=0.0,
+                    volatility_pct=0.0,
+                    skewness=0.0,
+                    kurtosis=0.0,
+                    var_95_pct=0.0,
+                    cvar_95_pct=0.0,
+                    recovery_time_days=0
+                ),
+                strategy_analysis=StrategyAnalysis(
+                    avg_trade_duration_minutes=0,
+                    best_trade_pnl_pct=0.0,
+                    worst_trade_pnl_pct=0.0,
+                    consecutive_wins=0,
+                    consecutive_losses=0,
+                    avg_bars_held=0,
+                    best_trade_duration=0,
+                    worst_trade_duration=0
+                ),
+                benchmark_comparison=BenchmarkComparison(
+                    benchmark_return_pct=0.0,
+                    strategy_return_pct=0.0,
+                    outperformance_pct=0.0,
+                    benchmark_sharpe=0.0,
+                    strategy_sharpe=0.0,
+                    sharpe_improvement=0.0,
+                    benchmark_max_dd_pct=0.0,
+                    strategy_max_dd_pct=0.0,
+                    drawdown_improvement_pct=0.0
+                ),
+                initial_capital=self.config.initial_capital,
+                final_capital=self.portfolio.current_equity,
+                peak_capital=self.portfolio.peak_equity
+            )
+
+            # Perform signal quality analysis
+            signal_quality_metrics = self.signal_quality_analyzer.analyze_signal_quality(
+                temp_result, self.portfolio.closed_trades, self.all_generated_signals
+            )
+
+            # Perform parameter optimization
+            current_params = {
+                "confidence_threshold": self.config.confidence_threshold,
+                "leverage": self.config.leverage,
+                "max_position_size_pct": self.config.max_position_size_pct
+            }
+
+            optimization_results = self.signal_quality_analyzer.optimize_parameters(
+                temp_result, self.portfolio.closed_trades, current_params
+            )
+
+            # Store optimization results in the signal quality metrics
+            signal_quality_metrics.optimization_results = [opt.to_dict() for opt in optimization_results]
+
+            logger.info(
+                "Signal quality analysis completed",
+                total_signals=len(self.all_generated_signals),
+                total_trades=len(self.portfolio.closed_trades),
+                win_rate=signal_quality_metrics.win_rate,
+                confidence_accuracy=signal_quality_metrics.confidence_accuracy,
+                optimization_recommendations=len(optimization_results)
+            )
+
+            return signal_quality_metrics
+
+        except Exception as e:
+            logger.error("Signal quality analysis failed", error=str(e))
+            return None

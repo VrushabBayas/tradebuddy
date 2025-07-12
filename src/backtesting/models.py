@@ -407,6 +407,14 @@ class BacktestResult(BaseModelWithTimestamp):
     signal_conversion_rate_pct: float = Field(
         default=0.0, description="Percentage of signals that became trades"
     )
+    
+    # Signal quality analysis
+    signal_quality_metrics: Optional[Dict[str, Any]] = Field(
+        default=None, description="Signal quality analysis results"
+    )
+    optimization_results: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Parameter optimization results"
+    )
 
     @property
     def winning_trades(self) -> List[BacktestTrade]:
