@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # Currency Configuration
     base_currency: str = Field(default="INR", env="BASE_CURRENCY")
     usd_to_inr_rate: float = Field(default=85.0, env="USD_TO_INR_RATE")
+    
+    # Timezone Configuration
+    default_timezone: str = Field(default="Asia/Kolkata", env="DEFAULT_TIMEZONE")
 
     # API Rate Limiting
     delta_api_rate_limit: int = Field(default=10, env="DELTA_API_RATE_LIMIT")

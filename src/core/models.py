@@ -227,9 +227,10 @@ class TradingSignal(BaseModelWithTimestamp):
     
     @property
     def candle_time_display(self) -> str:
-        """Get formatted candle timestamp for display."""
+        """Get formatted candle timestamp for display in IST."""
         if self.candle_timestamp:
-            return self.candle_timestamp.strftime('%Y-%m-%d %I:%M %p')
+            from src.utils.helpers import format_ist_time
+            return format_ist_time(self.candle_timestamp, include_seconds=True)
         return "N/A"
     
     @property

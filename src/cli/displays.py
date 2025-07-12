@@ -363,9 +363,10 @@ class CLIDisplays:
             candle_table.add_column("Value", style="white", width=40)
             
             # Add timestamp
+            from src.utils.helpers import format_ist_time
             candle_table.add_row(
                 "Candle Time", 
-                latest_candle.timestamp.strftime('%Y-%m-%d %I:%M %p UTC')
+                format_ist_time(latest_candle.timestamp, include_seconds=True)
             )
             
             # Determine basic candle type

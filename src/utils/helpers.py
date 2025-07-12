@@ -7,6 +7,7 @@ for consistent and safe operations throughout the application.
 
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Union
+from datetime import datetime, timezone, timedelta
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -754,3 +755,80 @@ def round_to_significant_figures(value: NumericType, sig_figs: int) -> Decimal:
     precision = sig_figs - int(math.floor(math.log10(abs(float(decimal_val))))) - 1
 
     return decimal_val.quantize(Decimal(f"0.{'0' * precision}"), rounding=ROUND_HALF_UP)
+
+
+# ============================================================================
+# Timezone and DateTime Functions
+# ============================================================================
+
+# Indian Standard Time (IST) is UTC+5:30
+IST_OFFSET = timedelta(hours=5, minutes=30)
+IST_TIMEZONE = timezone(IST_OFFSET)
+
+
+def utc_to_ist(utc_datetime: datetime) -> datetime:
+    """
+    Convert UTC datetime to Indian Standard Time (IST).
+    
+    Args:
+        utc_datetime: UTC datetime object
+        
+    Returns:
+        IST datetime object
+    """
+    if utc_datetime.tzinfo is None:
+        # Assume UTC if no timezone info
+        utc_datetime = utc_datetime.replace(tzinfo=timezone.utc)
+    elif utc_datetime.tzinfo != timezone.utc:
+        # Convert to UTC first if it's in a different timezone
+        utc_datetime = utc_datetime.astimezone(timezone.utc)
+    
+    return utc_datetime.astimezone(IST_TIMEZONE)
+
+
+def format_ist_time(utc_datetime: datetime, include_seconds: bool = True) -> str:
+    """
+    Format UTC datetime as IST 12-hour format string.
+    
+    Args:
+        utc_datetime: UTC datetime object
+        include_seconds: Whether to include seconds in the format
+        
+    Returns:
+        Formatted IST time string (e.g., "2025-07-12 11:00:30 PM IST")
+    """
+    ist_datetime = utc_to_ist(utc_datetime)
+    
+    if include_seconds:
+        return ist_datetime.strftime('%Y-%m-%d %I:%M:%S %p IST')
+    else:
+        return ist_datetime.strftime('%Y-%m-%d %I:%M %p IST')
+
+
+def format_ist_time_only(utc_datetime: datetime, include_seconds: bool = True) -> str:
+    """
+    Format UTC datetime as IST time only (without date).
+    
+    Args:
+        utc_datetime: UTC datetime object
+        include_seconds: Whether to include seconds in the format
+        
+    Returns:
+        Formatted IST time string (e.g., "11:00:30 PM IST")
+    """
+    ist_datetime = utc_to_ist(utc_datetime)
+    
+    if include_seconds:
+        return ist_datetime.strftime('%I:%M:%S %p IST')
+    else:
+        return ist_datetime.strftime('%I:%M %p IST')
+
+
+def get_current_ist_time() -> datetime:
+    """
+    Get current time in IST.
+    
+    Returns:
+        Current IST datetime object
+    """
+    return datetime.now(IST_TIMEZONE)
