@@ -223,6 +223,23 @@ class SessionConfig(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class RealTimeConfig(BaseModel):
+    """Configuration for real-time analysis sessions."""
+    
+    strategy: StrategyType = Field(..., description="Strategy to use for real-time analysis")
+    symbol: Symbol = Field(default=Symbol.BTCUSDT, description="Trading symbol")
+    timeframe: TimeFrame = Field(default=TimeFrame.ONE_MINUTE, description="Analysis timeframe")
+    duration_minutes: int = Field(default=5, ge=1, le=60, description="Session duration in minutes")
+    buffer_size: int = Field(default=50, ge=20, le=100, description="OHLCV buffer size")
+    confidence_threshold: int = Field(default=5, ge=1, le=10, description="Minimum confidence for signals")
+    
+    # Real-time specific settings
+    historical_candles: int = Field(default=45, ge=20, le=100, description="Historical candles to preload")
+    max_analysis_count: int = Field(default=50, ge=1, le=200, description="Maximum number of analyses per session")
+    
+    model_config = ConfigDict(use_enum_values=True)
+
+
 class SessionResults(BaseModelWithTimestamp):
     """Results from a trading session."""
     
