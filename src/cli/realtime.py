@@ -1003,7 +1003,7 @@ class RealTimeAnalyzer:
                 "Buffer refreshed with fresh data",
                 symbol=str(symbol),
                 candles_loaded=len(fresh_data.ohlcv_data),
-                latest_timestamp=fresh_data.ohlcv_data[-1].timestamp.isoformat()
+                latest_timestamp=fresh_data.latest_ohlcv.timestamp.isoformat() if fresh_data.latest_ohlcv else "Unknown"
                 if fresh_data.ohlcv_data
                 else None,
             )

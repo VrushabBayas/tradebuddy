@@ -883,7 +883,7 @@ class EMACrossoverStrategy(BaseStrategy):
                     pattern_context = f"Pattern detected: {', '.join(patterns_detected)}"
             
             # Get current candle timestamp
-            candle_timestamp = market_data.ohlcv_data[-1].timestamp if market_data.ohlcv_data else None
+            candle_timestamp = market_data.latest_ohlcv.timestamp if market_data.ohlcv_data else None
             
             signal = TradingSignal(
                 symbol=market_data.symbol,

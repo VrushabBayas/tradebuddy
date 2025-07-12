@@ -627,7 +627,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
                 candle_timestamp = None
                 
                 if market_data.ohlcv_data:
-                    candle_timestamp = market_data.ohlcv_data[-1].timestamp
+                    candle_timestamp = market_data.latest_ohlcv.timestamp if market_data.latest_ohlcv else None
                     try:
                         # Create TechnicalIndicators instance for pattern analysis
                         from src.analysis.indicators import TechnicalIndicators
@@ -697,7 +697,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
             # If no valid signal found, create a default WAIT signal
             if not signals:
                 # Get candle timestamp for default signal
-                candle_timestamp = market_data.ohlcv_data[-1].timestamp if market_data.ohlcv_data else None
+                candle_timestamp = market_data.latest_ohlcv.timestamp if market_data.latest_ohlcv else None if market_data.ohlcv_data else None
                 
                 default_signal = TradingSignal(
                     symbol=market_data.symbol,
@@ -717,7 +717,7 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
             logger.error("Error parsing trading signals", error=str(e))
 
             # Create fallback signal
-            candle_timestamp = market_data.ohlcv_data[-1].timestamp if market_data.ohlcv_data else None
+            candle_timestamp = market_data.latest_ohlcv.timestamp if market_data.latest_ohlcv else None if market_data.ohlcv_data else None
             
             fallback_signal = TradingSignal(
                 symbol=market_data.symbol,

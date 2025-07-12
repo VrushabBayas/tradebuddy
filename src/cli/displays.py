@@ -181,7 +181,7 @@ class CLIDisplays:
         data_table.add_column("Value", style="white", width=20)
 
         # Get latest candle
-        latest_candle = market_data.ohlcv_data[-1] if market_data.ohlcv_data else None
+        latest_candle = market_data.latest_ohlcv if market_data.ohlcv_data else None
 
         if latest_candle:
             data_table.add_row("Current Price", f"${market_data.current_price:,.2f}")
@@ -355,7 +355,7 @@ class CLIDisplays:
             
             # Get candlestick formation from OHLCV data
             formation = tech_indicators.create_candlestick_formation(market_data.ohlcv_data)
-            latest_candle = market_data.ohlcv_data[-1]
+            latest_candle = market_data.latest_ohlcv
             
             # Create candle analysis table
             candle_table = Table(title="Candlestick Pattern Details")
