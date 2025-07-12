@@ -376,6 +376,21 @@ class CLIDisplays:
             
             # Add formation details if detected
             if formation:
+                # Consistency validation: ensure pattern direction matches candle type
+                pattern_is_bullish = formation.signal_direction in ["strong_bullish", "bullish"]
+                pattern_is_bearish = formation.signal_direction in ["strong_bearish", "bearish"]
+                
+                if (is_bullish and pattern_is_bearish) or (not is_bullish and pattern_is_bullish):
+                    # Log inconsistency for debugging
+                    self.console.print("⚠️  Pattern inconsistency detected - pattern may need recalibration", style="yellow dim")
+                    import structlog
+                    logger = structlog.get_logger(__name__)
+                    logger.warning(
+                        "Candlestick pattern inconsistency detected",
+                        candle_bullish=is_bullish,
+                        pattern_direction=formation.signal_direction,
+                        pattern_name=formation.pattern_name
+                    )
                 # Add fire emoji for strong patterns
                 pattern_display = f"🔥 {formation.pattern_display_name}" if formation.is_strong_pattern else f"📈 {formation.pattern_display_name}"
                 candle_table.add_row("Pattern", pattern_display)

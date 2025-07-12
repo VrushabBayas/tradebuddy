@@ -686,21 +686,21 @@ class TechnicalIndicators:
             pattern_type = "doji"
             signal_direction = "neutral"
 
-        # STRONG BULLISH CANDLE - Enhanced detection
+        # STRONG BULLISH CANDLE - Enhanced detection (ONLY for bullish candles)
         elif (is_bullish_candle and body_ratio >= 0.7):
             patterns_detected.append("strong_bullish")
             pattern_strength = 8
             pattern_type = "strong_bullish"
-            signal_direction = "bullish"
+            signal_direction = "strong_bullish"
 
-        # STRONG BEARISH CANDLE - Enhanced detection  
+        # STRONG BEARISH CANDLE - Enhanced detection (ONLY for bearish candles)
         elif (is_bearish_candle and body_ratio >= 0.7):
             patterns_detected.append("strong_bearish")
             pattern_strength = 8
             pattern_type = "strong_bearish"
-            signal_direction = "bearish"
+            signal_direction = "strong_bearish"
 
-        # MODERATE PATTERNS
+        # MODERATE PATTERNS (with strict candle type validation)
         elif is_bullish_candle and body_ratio >= 0.4:
             patterns_detected.append("moderate_bullish")
             pattern_strength = 5
@@ -711,7 +711,19 @@ class TechnicalIndicators:
             pattern_strength = 5
             pattern_type = "moderate_bearish"
             signal_direction = "bearish"
+        # WEAK PATTERNS (for small bodies)
+        elif is_bullish_candle and body_ratio >= 0.1:
+            patterns_detected.append("weak_bullish")
+            pattern_strength = 3
+            pattern_type = "weak_bullish"
+            signal_direction = "bullish"
+        elif is_bearish_candle and body_ratio >= 0.1:
+            patterns_detected.append("weak_bearish")
+            pattern_strength = 3
+            pattern_type = "weak_bearish"
+            signal_direction = "bearish"
         else:
+            # For very small bodies or equal open/close
             pattern_strength = 2
             pattern_type = "indecisive"
             signal_direction = "neutral"
@@ -1058,9 +1070,20 @@ class TechnicalIndicators:
     ) -> str:
         """Generate human-readable visual description of candle."""
         
-        # Determine candle color and size
+        # Determine candle color and size (validate actual candle direction)
         is_bullish = candle.close > candle.open
-        color = "green" if is_bullish else "red"
+        is_bearish = candle.close < candle.open
+        
+        # Be explicit about color determination
+        if is_bullish:
+            color = "green"
+            candle_direction = "bullish"
+        elif is_bearish:
+            color = "red"
+            candle_direction = "bearish"
+        else:
+            color = "neutral"  # Doji case where close == open
+            candle_direction = "neutral"
         
         # Body size description
         if body_ratio >= 0.8:
@@ -1093,13 +1116,19 @@ class TechnicalIndicators:
         if not shadow_desc:
             shadow_desc = "minimal shadows"
         
-        # Special pattern descriptions
+        # Special pattern descriptions (validate pattern matches candle direction)
         pattern_descriptions = {
             "bearish_marabozu": f"Strong {color} candle with virtually no shadows - maximum bearish pressure",
-            "bullish_marabozu": f"Strong {color} candle with virtually no shadows - maximum bullish pressure",
-            "shooting_star": f"Small body with long upper shadow - potential reversal signal",
-            "hammer": f"Small body with long lower shadow - potential reversal signal",
-            "doji": f"Very small body indicating market indecision",
+            "bullish_marabozu": f"Strong {color} candle with virtually no shadows - maximum bullish pressure", 
+            "shooting_star": f"Small {color} body with long upper shadow - potential reversal signal",
+            "hammer": f"Small {color} body with long lower shadow - potential reversal signal",
+            "doji": f"Very small {color} body indicating market indecision",
+            "strong_bullish": f"Large {color} body with {shadow_desc}",
+            "strong_bearish": f"Large {color} body with {shadow_desc}",
+            "moderate_bullish": f"Medium {color} body with {shadow_desc}",
+            "moderate_bearish": f"Medium {color} body with {shadow_desc}",
+            "weak_bullish": f"Small {color} body with {shadow_desc}",
+            "weak_bearish": f"Small {color} body with {shadow_desc}",
         }
         
         if pattern_name in pattern_descriptions:
