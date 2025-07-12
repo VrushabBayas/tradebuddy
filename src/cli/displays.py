@@ -172,7 +172,7 @@ class CLIDisplays:
         self.console.print(summary_table)
 
     def display_market_data_summary(self, market_data: MarketData) -> None:
-        """Display market data summary."""
+        """Display market data summary with immediate candlestick pattern analysis."""
         self.console.print("\n📊 Market Data Summary", style="bold cyan")
 
         # Create market data table
@@ -194,6 +194,10 @@ class CLIDisplays:
         data_table.add_row("Data Points", str(len(market_data.ohlcv_data)))
 
         self.console.print(data_table)
+        
+        # Add immediate candlestick pattern analysis
+        if latest_candle and len(market_data.ohlcv_data) >= 10:
+            self._display_immediate_candlestick_analysis(market_data)
 
     def display_analysis_results(self, analysis_result: AnalysisResult) -> None:
         """Display analysis results."""
@@ -338,3 +342,89 @@ class CLIDisplays:
                 style="red",
             )
         )
+
+    def _display_immediate_candlestick_analysis(self, market_data: MarketData) -> None:
+        """Display immediate candlestick pattern analysis from OHLCV data."""
+        from src.analysis.indicators import TechnicalIndicators
+        
+        self.console.print("\n🕯️ Current Candle Analysis", style="bold yellow")
+        
+        try:
+            # Create technical indicators instance for pattern analysis
+            tech_indicators = TechnicalIndicators()
+            
+            # Get candlestick formation from OHLCV data
+            formation = tech_indicators.create_candlestick_formation(market_data.ohlcv_data)
+            latest_candle = market_data.ohlcv_data[-1]
+            
+            # Create candle analysis table
+            candle_table = Table(title="Candlestick Pattern Details")
+            candle_table.add_column("Property", style="cyan", width=18)
+            candle_table.add_column("Value", style="white", width=40)
+            
+            # Add timestamp
+            candle_table.add_row(
+                "Candle Time", 
+                latest_candle.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')
+            )
+            
+            # Determine basic candle type
+            is_bullish = latest_candle.close > latest_candle.open
+            candle_type = "🟢 Bullish" if is_bullish else "🔴 Bearish"
+            candle_table.add_row("Candle Type", candle_type)
+            
+            # Add formation details if detected
+            if formation:
+                # Add fire emoji for strong patterns
+                pattern_display = f"🔥 {formation.pattern_display_name}" if formation.is_strong_pattern else f"📈 {formation.pattern_display_name}"
+                candle_table.add_row("Pattern", pattern_display)
+                candle_table.add_row("Strength", f"{formation.strength}/10")
+                candle_table.add_row("Signal Direction", formation.signal_direction.replace('_', ' ').title())
+                candle_table.add_row("Description", formation.visual_description)
+                candle_table.add_row("Trend Context", formation.trend_context.title())
+            else:
+                candle_table.add_row("Pattern", "Standard Candle")
+                candle_table.add_row("Strength", "N/A")
+                candle_table.add_row("Description", "Regular price movement")
+            
+            # Add body/shadow analysis
+            body_size = abs(latest_candle.close - latest_candle.open)
+            total_range = latest_candle.high - latest_candle.low
+            body_ratio = (body_size / total_range * 100) if total_range > 0 else 0
+            
+            candle_table.add_row("Body Size", f"{body_ratio:.1f}% of total range")
+            
+            # Add volume analysis
+            if latest_candle.volume > 0:
+                # Compare with average volume if we have enough data
+                if len(market_data.ohlcv_data) >= 10:
+                    recent_volumes = [c.volume for c in market_data.ohlcv_data[-10:] if c.volume > 0]
+                    if recent_volumes:
+                        avg_volume = sum(recent_volumes) / len(recent_volumes)
+                        volume_ratio = latest_candle.volume / avg_volume
+                        volume_status = "🔥 High" if volume_ratio > 1.5 else "📊 Normal" if volume_ratio > 0.8 else "📉 Low"
+                        candle_table.add_row("Volume Status", f"{volume_status} ({volume_ratio:.1f}x avg)")
+                    else:
+                        candle_table.add_row("Volume Status", "📊 Normal")
+                else:
+                    candle_table.add_row("Volume Status", f"{latest_candle.volume:,.0f}")
+            else:
+                candle_table.add_row("Volume Status", "⚠️ No Volume Data")
+            
+            self.console.print(candle_table)
+            
+            # Add educational note
+            if formation and formation.is_strong_pattern:
+                self.console.print(
+                    Panel(
+                        f"🎓 [bold]Pattern Education[/bold]\n"
+                        f"{formation.visual_description}\n\n"
+                        f"This pattern suggests {formation.signal_direction.replace('_', ' ')} sentiment "
+                        f"and will be used as input for technical analysis.",
+                        title="📚 Educational Context",
+                        style="blue",
+                    )
+                )
+                
+        except Exception as e:
+            self.console.print(f"⚠️ Could not analyze candlestick pattern: {e}", style="yellow")
