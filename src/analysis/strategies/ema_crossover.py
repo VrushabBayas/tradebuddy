@@ -295,6 +295,9 @@ class EMACrossoverStrategy(BaseStrategy):
                 enable_volume = True
                 enable_candlestick = True
 
+            # Get volume ratio first for filter usage
+            volume_ratio = volume_analysis.get("volume_ratio", 1.0)
+
             # Enhanced filters with pattern-based validation
             enhanced_long_filters = {
                 "rsi_filter": (current_rsi < 70) if enable_rsi else True,  # Not overbought
@@ -337,7 +340,6 @@ class EMACrossoverStrategy(BaseStrategy):
                 enhanced_short_filters["rsi_filter"] = True  # Override RSI filter for overbought reversal
 
             # Volume confirmation for crossover (legacy)
-            volume_ratio = volume_analysis.get("volume_ratio", 1.0)
             volume_confirmed = (
                 volume_ratio > TradingConstants.VOLUME_CONFIRMATION_THRESHOLD
             )
