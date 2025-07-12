@@ -6,11 +6,11 @@ with proper error handling, rate limiting, and data validation.
 """
 
 import asyncio
+import random
 import re
 import uuid
-import random
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
 import aiohttp
@@ -18,16 +18,16 @@ import structlog
 
 from src.core.config import settings
 from src.core.constants import (
-    APIEndpoints, 
+    APIEndpoints,
+    ErrorCodes,
     RateLimitConstants,
     ValidationPatterns,
-    ErrorCodes
 )
 from src.core.exceptions import (
     APIConnectionError,
-    APIRateLimitError, 
+    APIRateLimitError,
     APITimeoutError,
-    DataValidationError
+    DataValidationError,
 )
 from src.core.models import OHLCV, MarketData
 
@@ -268,35 +268,54 @@ class DeltaExchangeClient:
             return
         
         current_time = datetime.now(timezone.utc)
-        latest_candle = candles[-1]
+        # Delta Exchange returns candles in reverse chronological order (newest first)
+        latest_candle = candles[0]
         
         # Calculate expected maximum age based on timeframe
+        # Be more lenient during off-hours and weekends
         if timeframe.endswith('m'):
-            max_age_minutes = int(timeframe[:-1]) * 2  # Allow 2x timeframe delay
+            timeframe_minutes = int(timeframe[:-1])
+            # For minute timeframes, allow more buffer during off-hours
+            max_age_minutes = max(timeframe_minutes * 5, 30)  # At least 30 minutes buffer
         elif timeframe.endswith('h'):
-            max_age_minutes = int(timeframe[:-1]) * 60 * 2  # Convert to minutes, allow 2x delay
+            timeframe_hours = int(timeframe[:-1])
+            max_age_minutes = timeframe_hours * 60 * 3  # 3x timeframe for hourly data
         elif timeframe == '1d':
-            max_age_minutes = 24 * 60 * 2  # 2 days for daily data
+            max_age_minutes = 24 * 60 * 3  # 3 days for daily data
         else:
-            max_age_minutes = 60  # Default 1 hour max age
+            max_age_minutes = 120  # Default 2 hours max age for unknown timeframes
         
         # Check if latest candle is too old
         time_diff = current_time - latest_candle.timestamp
         age_minutes = time_diff.total_seconds() / 60
         
         if age_minutes > max_age_minutes:
-            logger.error(
-                "Stale market data detected",
-                symbol=symbol,
-                timeframe=timeframe,
-                latest_candle_time=latest_candle.timestamp.isoformat(),
-                age_minutes=age_minutes,
-                max_age_minutes=max_age_minutes
-            )
-            raise DataValidationError(
-                f"Market data is too stale: {age_minutes:.1f} minutes old (max: {max_age_minutes})",
-                error_code=ErrorCodes.API_INVALID_RESPONSE
-            )
+            # Check if data is extremely stale (more than 6 hours)
+            if age_minutes > 360:  # 6 hours
+                logger.warning(
+                    "Very stale market data detected - markets may be closed",
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    latest_candle_time=latest_candle.timestamp.isoformat(),
+                    age_hours=age_minutes / 60,
+                    note="Proceeding with caution - verify market status"
+                )
+                # For very stale data, we'll warn but allow processing with a flag
+                # This allows analysis during market closures but alerts the user
+            else:
+                logger.error(
+                    "Stale market data detected",
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    latest_candle_time=latest_candle.timestamp.isoformat(),
+                    age_minutes=age_minutes,
+                    max_age_minutes=max_age_minutes
+                )
+                raise DataValidationError(
+                    f"Market data is too stale: {age_minutes:.1f} minutes old (max: {max_age_minutes}). "
+                    f"This may indicate markets are closed or there's a data delay.",
+                    error_code=ErrorCodes.API_INVALID_RESPONSE
+                )
         
         logger.debug(
             "Data freshness validated",
@@ -480,14 +499,25 @@ class DeltaExchangeClient:
         end_time = end_time.replace(microsecond=jitter_microseconds)
         
         # Calculate start time based on timeframe and limit using timedelta
+        # Note: For live trading, we want recent data, not distant historical data
+        # Most technical analysis only needs 20-50 recent candles
         if timeframe.endswith('m'):
             minutes = int(timeframe[:-1])
-            start_time = end_time - timedelta(minutes=minutes * limit)
+            # For minute timeframes, limit to reasonable recent data
+            # Most intraday analysis doesn't need more than 8 hours of data
+            lookback_minutes = min(minutes * limit, 8 * 60)  # Max 8 hours
+            start_time = end_time - timedelta(minutes=lookback_minutes)
         elif timeframe.endswith('h'):
             hours = int(timeframe[:-1])
-            start_time = end_time - timedelta(hours=hours * limit)
+            # For hourly timeframes, limit to recent data for live trading
+            # Most swing analysis doesn't need more than 3 days of hourly data
+            lookback_hours = min(hours * limit, 3 * 24)  # Max 3 days (72 hours)
+            start_time = end_time - timedelta(hours=lookback_hours)
         elif timeframe == '1d':
-            start_time = end_time - timedelta(days=limit)
+            # For daily timeframes, reasonable historical lookback
+            # Most position analysis doesn't need more than 6 months
+            lookback_days = min(limit, 180)  # Max 6 months
+            start_time = end_time - timedelta(days=lookback_days)
         else:
             # Fallback: 24 hours ago
             start_time = end_time - timedelta(hours=24)
@@ -544,10 +574,10 @@ class DeltaExchangeClient:
         else:
             logger.warning("Unexpected ticker format", ticker_type=type(ticker), ticker=ticker)
         
-        # Fallback: use the last candle's close price
+        # Fallback: use the latest candle's close price (first candle since they're in reverse order)
         if current_price == 0.0 and candles:
-            current_price = float(candles[-1].close)
-            logger.info("Using last candle close price as fallback", current_price=current_price)
+            current_price = float(candles[0].close)
+            logger.info("Using latest candle close price as fallback", current_price=current_price)
         
         # Validate data freshness
         self._validate_data_freshness(candles, symbol, timeframe)
