@@ -381,8 +381,8 @@ class DeltaExchangeClient:
         )
         
         params = {
-            "symbol": symbol,
-            "resolution": resolution,
+            "symbol": symbol.value,
+            "resolution": resolution.value,
             "start": int(start.timestamp()),
             "end": int(end.timestamp())
         }
@@ -435,7 +435,7 @@ class DeltaExchangeClient:
         
         logger.debug("Fetching ticker data", symbol=symbol)
         
-        params = {"symbol": symbol}
+        params = {"symbol": symbol.value}
         response = await self._make_request("GET", APIEndpoints.TICKERS, params=params)
         
         if not response.get("success", False):
