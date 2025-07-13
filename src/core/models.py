@@ -407,6 +407,15 @@ class AIModelConfig(BaseModel):
     fingpt_model_variant: str = Field(
         default="v3.2", description="FinGPT model variant (v3.1, v3.2, v3.3)"
     )
+    fingpt_api_endpoint: Optional[str] = Field(
+        default=None, description="FinGPT API endpoint URL (defaults to localhost:8000)"
+    )
+    fingpt_api_key: Optional[str] = Field(
+        default=None, description="FinGPT API key for authentication"
+    )
+    fingpt_timeout: int = Field(
+        default=30, description="FinGPT API request timeout in seconds"
+    )
     fallback_enabled: bool = Field(
         default=True, description="Enable fallback to Ollama if primary model fails"
     )

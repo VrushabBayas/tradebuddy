@@ -87,13 +87,34 @@ class ModelFactory:
         try:
             from src.analysis.ai_models.fingpt_client import FinGPTClient
             
-            # Use config for FinGPT-specific parameters
+            # Extract FinGPT-specific parameters from config
             model_variant = "v3.2"  # Default
-            if config and config.fingpt_model_variant:
-                model_variant = config.fingpt_model_variant
+            api_endpoint = None
+            api_key = None
+            timeout = 30
             
-            logger.debug("Creating FinGPT model", variant=model_variant)
-            return FinGPTClient(model_variant=model_variant, **kwargs)
+            if config:
+                if config.fingpt_model_variant:
+                    model_variant = config.fingpt_model_variant
+                if config.fingpt_api_endpoint:
+                    api_endpoint = config.fingpt_api_endpoint
+                if config.fingpt_api_key:
+                    api_key = config.fingpt_api_key
+                if config.fingpt_timeout:
+                    timeout = config.fingpt_timeout
+            
+            logger.debug("Creating FinGPT model", 
+                        variant=model_variant, 
+                        endpoint=api_endpoint, 
+                        has_api_key=bool(api_key))
+            
+            return FinGPTClient(
+                model_variant=model_variant,
+                api_endpoint=api_endpoint,
+                api_key=api_key,
+                timeout=timeout,
+                **kwargs
+            )
         except ImportError as e:
             logger.error("Failed to import FinGPT dependencies", error=str(e))
             raise ImportError(
