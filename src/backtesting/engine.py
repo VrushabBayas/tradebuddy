@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Type
 
 from src.analysis.strategies.base_strategy import BaseStrategy
 from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
+from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.analysis.strategies.combined import CombinedStrategy
 from src.backtesting.models import (
@@ -90,6 +91,7 @@ class BacktestEngine:
         """Create strategy instance based on type."""
         strategy_map: Dict[StrategyType, Type[BaseStrategy]] = {
             StrategyType.EMA_CROSSOVER: EMACrossoverStrategy,
+            StrategyType.EMA_CROSSOVER_V2: EMACrossoverV2Strategy,
             StrategyType.SUPPORT_RESISTANCE: SupportResistanceStrategy,
             StrategyType.COMBINED: CombinedStrategy,
         }

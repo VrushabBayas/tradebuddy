@@ -149,15 +149,20 @@ class RealTimeAnalyzer:
         strategy_table.add_column("Strategy", style="white", width=20)
 
         strategy_table.add_row("1", "EMA Crossover")
-        strategy_table.add_row("2", "Combined Strategy")
+        strategy_table.add_row("2", "EMA Crossover V2 ⭐")
+        strategy_table.add_row("3", "Combined Strategy")
 
         self.console.print(strategy_table)
 
         choice = Prompt.ask(
-            "\nSelect strategy for real-time analysis", choices=["1", "2"], default="1"
+            "\nSelect strategy for real-time analysis", choices=["1", "2", "3"], default="2"
         )
 
-        strategy_map = {"1": StrategyType.EMA_CROSSOVER, "2": StrategyType.COMBINED}
+        strategy_map = {
+            "1": StrategyType.EMA_CROSSOVER,
+            "2": StrategyType.EMA_CROSSOVER_V2,
+            "3": StrategyType.COMBINED
+        }
 
         return strategy_map[choice]
 
@@ -612,15 +617,22 @@ class RealTimeAnalyzer:
         strategy_table.add_row(
             "1", "EMA Crossover", "Trend detection across timeframes"
         )
-        strategy_table.add_row("2", "Combined Strategy", "High-confidence signals only")
+        strategy_table.add_row(
+            "2", "EMA Crossover V2 ⭐", "Enhanced trend analysis with filters"
+        )
+        strategy_table.add_row("3", "Combined Strategy", "High-confidence signals only")
 
         self.console.print(strategy_table)
 
         choice = Prompt.ask(
-            "\nSelect strategy for monitoring", choices=["1", "2"], default="2"
+            "\nSelect strategy for monitoring", choices=["1", "2", "3"], default="2"
         )
 
-        strategy_map = {"1": StrategyType.EMA_CROSSOVER, "2": StrategyType.COMBINED}
+        strategy_map = {
+            "1": StrategyType.EMA_CROSSOVER,
+            "2": StrategyType.EMA_CROSSOVER_V2,
+            "3": StrategyType.COMBINED
+        }
 
         selected = strategy_map[choice]
         self.console.print(

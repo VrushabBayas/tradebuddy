@@ -413,3 +413,135 @@ def assert_signal_valid(signal: TradingSignal):
         assert signal.take_profit > 0
     if signal.risk_reward_ratio:
         assert signal.risk_reward_ratio > 0
+
+
+# Candlestick Body Significance Test Fixtures
+
+@pytest.fixture
+def small_body_candles():
+    """Create candles with small bodies for noise testing."""
+    from datetime import datetime, timezone
+    
+    return [
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50050, low=49950, close=50010,  # 10 points
+            volume=1000.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50060, low=49940, close=50025,  # 25 points
+            volume=1000.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50080, low=49920, close=50015,  # 15 points
+            volume=1000.0
+        ),
+    ]
+
+
+@pytest.fixture 
+def significant_body_candles():
+    """Create candles with significant bodies for signal testing."""
+    from datetime import datetime, timezone
+    
+    return [
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50500, low=49900, close=50450,  # 450 points (good for 1h)
+            volume=1000.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50100, low=49520, close=49550,  # 450 points bearish
+            volume=1000.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50350, low=49950, close=50320,  # 320 points
+            volume=1000.0
+        ),
+    ]
+
+
+@pytest.fixture
+def exceptional_body_candles():
+    """Create candles with exceptional bodies for confidence testing."""
+    from datetime import datetime, timezone
+    
+    return [
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50800, low=49700, close=50750,  # 750 points (exceptional for 1h)
+            volume=1500.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50150, low=49200, close=49300,  # 700 points bearish
+            volume=1500.0
+        ),
+    ]
+
+
+@pytest.fixture
+def doji_candles():
+    """Create doji candles for neutral signal testing."""
+    from datetime import datetime, timezone
+    
+    return [
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50100, low=49900, close=50002,  # 2 points (perfect doji)
+            volume=1000.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50150, low=49850, close=49999,  # 1 point
+            volume=1000.0
+        ),
+        OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50080, low=49920, close=50004,  # 4 points
+            volume=1000.0
+        ),
+    ]
+
+
+@pytest.fixture
+def timeframe_test_data():
+    """Create test data for different timeframe scenarios."""
+    from datetime import datetime, timezone
+    
+    # 100-point movement that behaves differently across timeframes
+    base_candle = OHLCV(
+        timestamp=datetime.now(timezone.utc),
+        open=50000, high=50150, low=49950, close=50100,  # 100 points
+        volume=1000.0
+    )
+    
+    return {
+        "candle": base_candle,
+        "timeframes": ["1m", "5m", "15m", "1h", "4h", "1d"],
+        "expected_1m": "exceptional",  # 100 points is large for 1m  
+        "expected_1h": "insufficient", # 100 points is small for 1h
+        "expected_1d": "insufficient", # 100 points is tiny for 1d
+    }
+
+
+def create_candle_with_body_size(body_size: float, base_price: float = 50000) -> OHLCV:
+    """Helper function to create candles with specific body sizes."""
+    from datetime import datetime, timezone
+    
+    close_price = base_price + body_size
+    high_price = max(base_price, close_price) + 50
+    low_price = min(base_price, close_price) - 50
+    
+    return OHLCV(
+        timestamp=datetime.now(timezone.utc),
+        open=base_price,
+        high=high_price,
+        low=low_price,
+        close=close_price,
+        volume=1000.0
+    )

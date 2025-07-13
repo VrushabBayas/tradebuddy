@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.analysis.strategies.combined import CombinedStrategy
 from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
+from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.backtesting.engine import BacktestEngine
 from src.backtesting.models import BacktestConfig
@@ -50,6 +51,7 @@ class CLIApplication:
         self.strategies = {
             StrategyType.SUPPORT_RESISTANCE: SupportResistanceStrategy(),
             StrategyType.EMA_CROSSOVER: EMACrossoverStrategy(),
+            StrategyType.EMA_CROSSOVER_V2: EMACrossoverV2Strategy(),
             StrategyType.COMBINED: CombinedStrategy(),
         }
 
@@ -124,17 +126,18 @@ class CLIApplication:
 
         # Get user choice
         choice = Prompt.ask(
-            "\nSelect strategy", choices=["1", "2", "3", "4", "5", "6", "7"], default="3"
+            "\nSelect strategy", choices=["1", "2", "3", "4", "5", "6", "7", "8"], default="4"
         )
 
         strategy_map = {
             "1": StrategyType.SUPPORT_RESISTANCE,
             "2": StrategyType.EMA_CROSSOVER,
-            "3": StrategyType.COMBINED,
-            "4": "REALTIME",  # Special marker for real-time analysis
-            "5": "MONITORING",  # Special marker for monitoring mode
-            "6": "BACKTESTING",  # Special marker for backtesting
-            "7": None,
+            "3": StrategyType.EMA_CROSSOVER_V2,
+            "4": StrategyType.COMBINED,
+            "5": "REALTIME",  # Special marker for real-time analysis
+            "6": "MONITORING",  # Special marker for monitoring mode
+            "7": "BACKTESTING",  # Special marker for backtesting
+            "8": None,
         }
 
         selected_strategy = strategy_map[choice]
@@ -348,7 +351,7 @@ class CLIApplication:
                 market_data = await self.delta_client.get_market_data(
                     symbol=config.symbol,
                     timeframe=config.timeframe,
-                    limit=100,
+                    limit=200,
                 )
 
                 progress.update(task, description="✅ Market data fetched successfully")

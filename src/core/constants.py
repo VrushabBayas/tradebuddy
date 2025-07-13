@@ -98,6 +98,36 @@ class TradingConstants:
     VOLUME_CONFIRMATION_WEIGHT = 0.2  # 20% weight for volume confirmation
     PRICE_ACTION_WEIGHT = 0.1  # 10% weight for price action consistency
 
+    # EMA Crossover V2 Enhanced Constants
+    EMA_V2_TREND_FILTER_PERIOD = 50  # 50 EMA for trend filtering
+    EMA_V2_MIN_TREND_STRENGTH = 40  # Minimum trend strength threshold
+    EMA_V2_MIN_TREND_QUALITY = 70  # Minimum trend quality threshold
+    EMA_V2_MIN_TREND_DURATION = 3  # Minimum trend duration in periods
+    
+    # V2 Trend Quality Scoring Weights
+    V2_TREND_STRENGTH_WEIGHT = 0.4  # 40% weight for trend strength
+    V2_EMA_ALIGNMENT_WEIGHT = 0.2  # 20% weight for EMA alignment
+    V2_TREND_DURATION_WEIGHT = 0.2  # 20% weight for trend duration
+    V2_MARKET_STRUCTURE_WEIGHT = 0.2  # 20% weight for market structure
+    
+    # V2 Market Structure Constants
+    V2_SWING_DETECTION_PERIOD = 5  # Period for swing high/low detection
+    V2_STRUCTURE_LOOKBACK = 10  # Lookback periods for structure analysis
+    V2_HIGHER_HIGHS_THRESHOLD = 2  # Minimum higher highs for bullish structure
+    V2_LOWER_LOWS_THRESHOLD = 2  # Minimum lower lows for bearish structure
+    
+    # V2 Volatility Constants
+    V2_HIGH_VOLATILITY_THRESHOLD = 0.7  # High volatility percentile threshold
+    V2_ATR_LOOKBACK_PERIODS = 50  # ATR lookback for volatility percentile
+    V2_VOLATILITY_FILTER_THRESHOLD = 0.8  # Extreme volatility filter
+    
+    # V2 Enhanced Signal Scoring
+    V2_BASE_CONFIDENCE_BONUS = 5  # Base confidence for EMA crossover
+    V2_TREND_FILTER_BONUS = 1  # Bonus for 50 EMA trend alignment
+    V2_QUALITY_BONUS_MULTIPLIER = 0.05  # Multiplier for trend quality bonus
+    V2_STRUCTURE_BONUS = 1  # Bonus for favorable market structure
+    V2_VOLUME_CONFLUENCE_BONUS = 1  # Bonus for volume-pattern confluence
+
     # Confirmation Levels
     STRONG_CONFIRMATION_LEVEL = 8  # Level 8+ for strong confirmation
     MODERATE_CONFIRMATION_LEVEL = 6  # Level 6+ for moderate confirmation
@@ -106,6 +136,35 @@ class TradingConstants:
     # Position Risk Constants
     POSITION_RISK_TOLERANCE_MULTIPLIER = 1.2  # 20% tolerance for position risk
     LEVERAGE_SAFETY_MULTIPLIER = 1.5  # 50% safety margin for leverage calculations
+
+
+# Candlestick Body Analysis Constants
+class CandlestickConstants:
+    """Constants for candlestick body significance analysis."""
+    
+    # Percentage-based thresholds (body vs total candle range)
+    DOJI_BODY_THRESHOLD_PCT = 5.0  # Body ≤ 5% of range = doji
+    SPINNING_TOP_THRESHOLD_PCT = 15.0  # Body ≤ 15% of range = spinning top
+    SIGNIFICANT_BODY_THRESHOLD_PCT = 25.0  # Body ≥ 25% of range = significant
+    
+    # ATR-based fallback thresholds (multipliers)
+    ATR_TINY_BODY_MULTIPLIER = 0.3    # < 0.3x ATR = tiny body
+    ATR_SMALL_BODY_MULTIPLIER = 0.6   # < 0.6x ATR = small body  
+    ATR_SIGNIFICANT_BODY_MULTIPLIER = 1.0  # ≥ 1.0x ATR = significant body
+    
+    # Timeframe-specific minimum body requirements (points)
+    TIMEFRAME_MIN_BODY_POINTS = {
+        "1m": {"min": 30, "max": 50},     # 1-minute: 30-50 points
+        "5m": {"min": 80, "max": 100},    # 5-minute: 80-100 points
+        "15m": {"min": 200, "max": 300},  # 15-minute: 200-300 points
+        "30m": {"min": 300, "max": 400},  # 30-minute: 300-400 points
+        "1h": {"min": 400, "max": 500},   # 1-hour: 400-500 points
+        "4h": {"min": 500, "max": 700},   # 4-hour: 500-700 points
+        "1d": {"min": 1000, "max": 2000}, # Daily: 1000-2000 points
+    }
+    
+    # Confidence boost for exceptional bodies
+    EXCEPTIONAL_BODY_CONFIDENCE_BOOST = 1.5
 
 
 # Ollama Constants

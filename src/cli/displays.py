@@ -86,22 +86,25 @@ class CLIDisplays:
             "2", "EMA Crossover", "Uses 9/15 EMA crossovers for trend change signals"
         )
         table.add_row(
-            "3",
-            "Combined Strategy",
-            "Combines both strategies for high-confidence signals",
+            "3", "EMA Crossover V2 ⭐", "Enhanced EMA strategy with 50 EMA filter & trend analysis"
         )
         table.add_row(
             "4",
+            "Combined Strategy",
+            "Combines multiple strategies for high-confidence signals",
+        )
+        table.add_row(
+            "5",
             "Real-Time Analysis ⭐",
             "Live market data streaming with real-time signals",
         )
         table.add_row(
-            "5", "Market Monitoring 🔄", "Continuous market monitoring with alerts"
+            "6", "Market Monitoring 🔄", "Continuous market monitoring with alerts"
         )
         table.add_row(
-            "6", "Strategy Backtesting 📊", "Test strategies against historical data"
+            "7", "Strategy Backtesting 📊", "Test strategies against historical data"
         )
-        table.add_row("7", "Exit", "Exit the application")
+        table.add_row("8", "Exit", "Exit the application")
 
         return table
 

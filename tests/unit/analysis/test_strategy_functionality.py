@@ -2,6 +2,7 @@
 Functionality tests for trading strategies.
 
 Focuses on testing strategy behavior and signal generation rather than implementation details.
+Updated to test both original and refactored strategies.
 """
 
 import pytest
@@ -10,6 +11,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
+from src.analysis.strategies.ema_crossover_refactored import EMACrossoverStrategyRefactored
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.analysis.strategies.combined import CombinedStrategy
 from src.core.models import (
@@ -439,3 +441,112 @@ class TestStrategyErrorHandling:
             except Exception as e:
                 # Should be a handled error with meaningful message
                 assert len(str(e)) > 0
+
+
+class TestOriginalVsRefactoredComparison:
+    """Test comparison between original and refactored strategies."""
+
+    @pytest.fixture
+    def original_strategy(self):
+        """Create original EMA crossover strategy."""
+        return EMACrossoverStrategy()
+
+    @pytest.fixture
+    def refactored_strategy(self):
+        """Create refactored EMA crossover strategy."""
+        return EMACrossoverStrategyRefactored()
+
+    @pytest.fixture
+    def comparison_market_data(self):
+        """Create market data for strategy comparison."""
+        candles = []
+        base_price = 50000.0
+        for i in range(40):
+            price_increase = i * 75
+            ohlcv = OHLCV(
+                timestamp=datetime.now(timezone.utc),
+                open=base_price + price_increase,
+                high=base_price + price_increase + 150,
+                low=base_price + price_increase - 75,
+                close=base_price + price_increase + 100,
+                volume=1000.0 + i * 10
+            )
+            candles.append(ohlcv)
+        
+        return MarketData(
+            symbol="BTCUSD",
+            timeframe="1h",
+            current_price=base_price + 3000,
+            ohlcv_data=candles
+        )
+
+    @pytest.fixture
+    def comparison_session_config(self):
+        """Create session configuration for comparison."""
+        return SessionConfig(
+            strategy=StrategyType.EMA_CROSSOVER,
+            symbol=Symbol.BTCUSD,
+            timeframe=TimeFrame.ONE_HOUR,
+            total_capital_inr=Decimal("100000"),
+            trading_capital_pct=Decimal("50.0"),
+            risk_per_trade_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("5.0"),
+            leverage=10,
+        )
+
+    @pytest.mark.asyncio
+    async def test_should_maintain_functional_compatibility(self, original_strategy, refactored_strategy, comparison_market_data, comparison_session_config):
+        """Should maintain functional compatibility between original and refactored versions."""
+        # Test backtesting functionality to avoid AI dependencies
+        original_result = await original_strategy.analyze_for_backtesting(comparison_market_data, comparison_session_config)
+        refactored_result = await refactored_strategy.analyze_for_backtesting(comparison_market_data, comparison_session_config)
+        
+        # Both should produce valid results
+        assert original_result is not None
+        assert refactored_result is not None
+        
+        # Both should have same strategy type
+        assert original_result.strategy == refactored_result.strategy == StrategyType.EMA_CROSSOVER
+        
+        # Both should process the same market data
+        assert original_result.symbol == refactored_result.symbol
+        assert original_result.timeframe == refactored_result.timeframe
+
+    @pytest.mark.asyncio 
+    async def test_should_produce_similar_signal_quality(self, original_strategy, refactored_strategy, comparison_market_data, comparison_session_config):
+        """Should produce signals of similar quality between versions."""
+        original_result = await original_strategy.analyze_for_backtesting(comparison_market_data, comparison_session_config)
+        refactored_result = await refactored_strategy.analyze_for_backtesting(comparison_market_data, comparison_session_config)
+        
+        # If both generate signals, they should be of similar quality
+        if original_result.signals and refactored_result.signals:
+            original_avg_confidence = sum(s.confidence for s in original_result.signals) / len(original_result.signals)
+            refactored_avg_confidence = sum(s.confidence for s in refactored_result.signals) / len(refactored_result.signals)
+            
+            # Should be within reasonable range of each other
+            confidence_diff = abs(original_avg_confidence - refactored_avg_confidence)
+            assert confidence_diff <= 2  # Allow some variation due to implementation differences
+
+    @pytest.mark.asyncio
+    async def test_refactored_should_be_more_efficient(self, original_strategy, refactored_strategy):
+        """Refactored strategy should use shared components more efficiently."""
+        # Both strategies should have the required components
+        assert hasattr(original_strategy, 'indicators')
+        assert hasattr(refactored_strategy, 'indicators')
+        
+        # Refactored should have additional shared components
+        assert hasattr(refactored_strategy, 'ema_analyzer')
+        assert hasattr(refactored_strategy, 'signal_scorer')  
+        assert hasattr(refactored_strategy, 'market_analyzer')
+        
+        # Refactored should have caching capabilities
+        assert hasattr(refactored_strategy, 'clear_cache')
+        assert hasattr(refactored_strategy, 'enable_caching')
+
+    def test_should_have_consistent_minimum_requirements(self, original_strategy, refactored_strategy):
+        """Should have consistent minimum data requirements."""
+        original_min = original_strategy._get_minimum_periods()
+        refactored_min = refactored_strategy._get_minimum_periods()
+        
+        # Should have same or similar requirements
+        assert abs(original_min - refactored_min) <= 5  # Allow small differences

@@ -601,15 +601,279 @@ class TechnicalIndicators:
 
         return fib_levels
 
-    def detect_advanced_candlestick_patterns(self, data: List[OHLCV]) -> Dict[str, Any]:
+    def calculate_body_significance(
+        self, 
+        current_candle: OHLCV, 
+        atr_value: float, 
+        timeframe: str
+    ) -> Dict[str, Any]:
         """
-        Detect advanced candlestick patterns with precise criteria.
+        Calculate candlestick body significance using multi-factor analysis.
+        
+        Combines timeframe-specific point requirements, percentage analysis,
+        and ATR-based volatility assessment to determine if a candlestick
+        has sufficient body size for directional bias classification.
+        
+        Args:
+            current_candle: Current OHLCV candle data
+            atr_value: Current ATR value for volatility context
+            timeframe: Trading timeframe (e.g., "1h", "1d")
+            
+        Returns:
+            Dictionary with body significance analysis
+        """
+        from src.core.constants import CandlestickConstants
+        
+        # Basic measurements
+        body_size = abs(current_candle.close - current_candle.open)
+        candle_range = current_candle.high - current_candle.low
+        
+        # Avoid division by zero
+        body_ratio = body_size / candle_range if candle_range > 0 else 0
+        atr_ratio = body_size / atr_value if atr_value > 0 else 0
+        
+        # Initialize result
+        result = {
+            "body_size": body_size,
+            "body_ratio": body_ratio,
+            "atr_ratio": atr_ratio,
+            "candle_range": candle_range,
+            "classification": "unknown",
+            "allow_directional_bias": False,
+            "confidence_boost": 1.0,
+            "is_doji": False,
+            "is_spinning_top": False,
+            "is_significant_body": False,
+            "reasoning": ""
+        }
+        
+        # 1. Always check for doji first (overrides everything)
+        if body_ratio <= (CandlestickConstants.DOJI_BODY_THRESHOLD_PCT / 100):
+            result.update({
+                "classification": "doji",
+                "allow_directional_bias": False,
+                "is_doji": True,
+                "reasoning": f"Doji pattern: body only {body_ratio:.1%} of candle range"
+            })
+            return result
+        
+        # 2. Check for spinning top
+        if body_ratio <= (CandlestickConstants.SPINNING_TOP_THRESHOLD_PCT / 100):
+            result.update({
+                "classification": "spinning_top",
+                "allow_directional_bias": False,
+                "is_spinning_top": True,
+                "reasoning": f"Spinning top: body {body_ratio:.1%} of range with long shadows"
+            })
+            return result
+        
+        # 3. Apply timeframe-specific point requirements
+        timeframe_config = CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS.get(timeframe)
+        
+        if timeframe_config:
+            min_points = timeframe_config["min"]
+            max_points = timeframe_config["max"]
+            
+            if body_size < min_points:
+                result.update({
+                    "classification": "insufficient_body",
+                    "allow_directional_bias": False,
+                    "reasoning": f"Body too small ({body_size:.0f} points < {min_points} min for {timeframe})"
+                })
+                return result
+            elif body_size > max_points:
+                result.update({
+                    "classification": "exceptional_body",
+                    "allow_directional_bias": True,
+                    "confidence_boost": CandlestickConstants.EXCEPTIONAL_BODY_CONFIDENCE_BOOST,
+                    "is_significant_body": True,
+                    "reasoning": f"Exceptional body ({body_size:.0f} points > {max_points} max for {timeframe})"
+                })
+                return result
+            else:
+                result.update({
+                    "classification": "significant_body",
+                    "allow_directional_bias": True,
+                    "is_significant_body": True,
+                    "reasoning": f"Significant body ({body_size:.0f} points within {min_points}-{max_points} range for {timeframe})"
+                })
+                return result
+        else:
+            # 4. Fallback for unknown timeframes using ATR
+            return self._atr_based_body_classification(result, body_size, atr_value, atr_ratio, timeframe)
+    
+    def _atr_based_body_classification(
+        self, 
+        result: Dict[str, Any], 
+        body_size: float, 
+        atr_value: float, 
+        atr_ratio: float, 
+        timeframe: str
+    ) -> Dict[str, Any]:
+        """
+        Fallback body classification using ATR when timeframe is unknown.
+        
+        Args:
+            result: Existing result dictionary to update
+            body_size: Calculated body size
+            atr_value: Current ATR value
+            atr_ratio: Body size / ATR ratio
+            timeframe: Trading timeframe
+            
+        Returns:
+            Updated result dictionary
+        """
+        from src.core.constants import CandlestickConstants
+        
+        # Try to interpolate from known timeframes first
+        interpolated_config = self._interpolate_timeframe_config(timeframe)
+        if interpolated_config:
+            min_points = interpolated_config["min"]
+            max_points = interpolated_config["max"]
+            
+            if body_size < min_points:
+                result.update({
+                    "classification": "insufficient_body",
+                    "allow_directional_bias": False,
+                    "reasoning": f"Body too small ({body_size:.0f} < {min_points} interpolated min for {timeframe})"
+                })
+            elif body_size > max_points:
+                result.update({
+                    "classification": "exceptional_body",
+                    "allow_directional_bias": True,
+                    "confidence_boost": CandlestickConstants.EXCEPTIONAL_BODY_CONFIDENCE_BOOST,
+                    "is_significant_body": True,
+                    "reasoning": f"Exceptional body ({body_size:.0f} > {max_points} interpolated max for {timeframe})"
+                })
+            else:
+                result.update({
+                    "classification": "significant_body",
+                    "allow_directional_bias": True,
+                    "is_significant_body": True,
+                    "reasoning": f"Significant body ({body_size:.0f} within interpolated {min_points}-{max_points} for {timeframe})"
+                })
+            return result
+        
+        # Pure ATR-based fallback
+        if atr_ratio < CandlestickConstants.ATR_TINY_BODY_MULTIPLIER:
+            result.update({
+                "classification": "tiny_body",
+                "allow_directional_bias": False,
+                "reasoning": f"Tiny body ({atr_ratio:.1f}x ATR < {CandlestickConstants.ATR_TINY_BODY_MULTIPLIER}x threshold)"
+            })
+        elif atr_ratio < CandlestickConstants.ATR_SMALL_BODY_MULTIPLIER:
+            result.update({
+                "classification": "small_body",
+                "allow_directional_bias": False,
+                "reasoning": f"Small body ({atr_ratio:.1f}x ATR < {CandlestickConstants.ATR_SMALL_BODY_MULTIPLIER}x threshold)"
+            })
+        elif atr_ratio >= CandlestickConstants.ATR_SIGNIFICANT_BODY_MULTIPLIER:
+            result.update({
+                "classification": "significant_body",
+                "allow_directional_bias": True,
+                "is_significant_body": True,
+                "reasoning": f"Significant body ({atr_ratio:.1f}x ATR ≥ {CandlestickConstants.ATR_SIGNIFICANT_BODY_MULTIPLIER}x threshold)"
+            })
+        else:
+            result.update({
+                "classification": "neutral_body",
+                "allow_directional_bias": False,
+                "reasoning": f"Neutral body ({atr_ratio:.1f}x ATR between thresholds)"
+            })
+        
+        return result
+    
+    def _interpolate_timeframe_config(self, timeframe: str) -> Optional[Dict[str, int]]:
+        """
+        Interpolate timeframe configuration for unknown timeframes.
+        
+        Args:
+            timeframe: Trading timeframe (e.g., "2h", "8h")
+            
+        Returns:
+            Interpolated config or None if interpolation not possible
+        """
+        from src.core.constants import CandlestickConstants
+        
+        # Extract numeric value and unit
+        if timeframe.endswith('m'):
+            try:
+                minutes = int(timeframe[:-1])
+                # Interpolate between minute timeframes
+                if 1 <= minutes <= 5:
+                    return self._linear_interpolate(
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["1m"],
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["5m"],
+                        (minutes - 1) / 4
+                    )
+                elif 5 < minutes <= 15:
+                    return self._linear_interpolate(
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["5m"],
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["15m"],
+                        (minutes - 5) / 10
+                    )
+                elif 15 < minutes <= 30:
+                    return self._linear_interpolate(
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["15m"],
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["30m"],
+                        (minutes - 15) / 15
+                    )
+            except ValueError:
+                pass
+        elif timeframe.endswith('h'):
+            try:
+                hours = int(timeframe[:-1])
+                # Interpolate between hour timeframes
+                if 1 <= hours <= 4:
+                    return self._linear_interpolate(
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["1h"],
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["4h"],
+                        (hours - 1) / 3
+                    )
+                elif 4 < hours <= 24:
+                    return self._linear_interpolate(
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["4h"],
+                        CandlestickConstants.TIMEFRAME_MIN_BODY_POINTS["1d"],
+                        (hours - 4) / 20
+                    )
+            except ValueError:
+                pass
+        
+        return None
+    
+    def _linear_interpolate(self, config1: Dict[str, int], config2: Dict[str, int], ratio: float) -> Dict[str, int]:
+        """
+        Linear interpolation between two timeframe configs.
+        
+        Args:
+            config1: First timeframe config
+            config2: Second timeframe config  
+            ratio: Interpolation ratio (0.0 to 1.0)
+            
+        Returns:
+            Interpolated configuration
+        """
+        return {
+            "min": int(config1["min"] + (config2["min"] - config1["min"]) * ratio),
+            "max": int(config1["max"] + (config2["max"] - config1["max"]) * ratio)
+        }
+
+    def detect_advanced_candlestick_patterns(
+        self, 
+        data: List[OHLCV], 
+        timeframe: str = "1h", 
+        atr_value: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Detect advanced candlestick patterns with timeframe-adaptive body significance analysis.
 
         Args:
             data: List of OHLCV data points
+            timeframe: Trading timeframe for body significance analysis (default: "1h")
+            atr_value: Current ATR value for volatility context (optional)
 
         Returns:
-            Dictionary with advanced pattern analysis
+            Dictionary with advanced pattern analysis including body significance
         """
         self._validate_data(data, min_periods=3)
 
@@ -635,98 +899,141 @@ class TechnicalIndicators:
         upper_shadow_pct = upper_shadow / candle_range if candle_range > 0 else 0
         lower_shadow_pct = lower_shadow / candle_range if candle_range > 0 else 0
 
+        # Calculate ATR for body significance analysis if not provided
+        if atr_value is None:
+            try:
+                atr_values = self.calculate_atr(data, period=14)
+                atr_value = atr_values[-1] if atr_values else body_size  # Fallback to body_size
+            except Exception:
+                atr_value = body_size  # Safe fallback
+
+        # Perform body significance analysis
+        body_analysis = self.calculate_body_significance(current, atr_value, timeframe)
+        
+        logger.debug(
+            "Body significance analysis", 
+            body_size=body_analysis["body_size"],
+            classification=body_analysis["classification"],
+            allow_directional_bias=body_analysis["allow_directional_bias"],
+            reasoning=body_analysis["reasoning"]
+        )
+
         # Advanced pattern detection
         patterns_detected = []
         pattern_strength = 0  # 1-10 scale
         pattern_type = "none"
         signal_direction = "neutral"
 
-        # BEARISH MARABOZU - Most bearish pattern
-        if (is_bearish_candle and 
-            body_ratio >= 0.95 and  # Body is 95%+ of candle
-            upper_shadow_pct <= 0.02 and  # Upper shadow ≤2% of range
-            lower_shadow_pct <= 0.02):  # Lower shadow ≤2% of range
-            patterns_detected.append("bearish_marabozu")
-            pattern_strength = 10
-            pattern_type = "bearish_marabozu"
-            signal_direction = "strong_bearish"
-
-        # SHOOTING STAR - Second most bearish pattern  
-        elif (upper_shadow_ratio >= 2.0 and  # Upper shadow ≥2x body
-              lower_shadow_ratio <= 0.5 and  # Lower shadow ≤50% of body
-              body_ratio <= 0.3):  # Small body (≤30% of range)
-            patterns_detected.append("shooting_star")
-            pattern_strength = 9
-            pattern_type = "shooting_star"
-            signal_direction = "strong_bearish"
-
-        # BULLISH MARABOZU - Most bullish pattern
-        elif (is_bullish_candle and
-              body_ratio >= 0.95 and  # Body is 95%+ of candle  
-              upper_shadow_pct <= 0.02 and  # Upper shadow ≤2% of range
-              lower_shadow_pct <= 0.02):  # Lower shadow ≤2% of range
-            patterns_detected.append("bullish_marabozu")
-            pattern_strength = 10
-            pattern_type = "bullish_marabozu"
-            signal_direction = "strong_bullish"
-
-        # ENHANCED HAMMER - Bullish reversal at support
-        elif (lower_shadow_ratio >= 2.0 and  # Lower shadow ≥2x body
-              upper_shadow_ratio <= 0.5 and  # Upper shadow ≤50% of body
-              body_ratio <= 0.3):  # Small body
-            patterns_detected.append("hammer")
-            pattern_strength = 7
-            pattern_type = "hammer"
-            signal_direction = "bullish"
-
-        # ENHANCED DOJI - Indecision
-        elif body_ratio <= 0.05:  # Body ≤5% of range
-            patterns_detected.append("doji")
-            pattern_strength = 3
-            pattern_type = "doji"
-            signal_direction = "neutral"
-
-        # STRONG BULLISH CANDLE - Enhanced detection (ONLY for bullish candles)
-        elif (is_bullish_candle and body_ratio >= 0.7):
-            patterns_detected.append("strong_bullish")
-            pattern_strength = 8
-            pattern_type = "strong_bullish"
-            signal_direction = "strong_bullish"
-
-        # STRONG BEARISH CANDLE - Enhanced detection (ONLY for bearish candles)
-        elif (is_bearish_candle and body_ratio >= 0.7):
-            patterns_detected.append("strong_bearish")
-            pattern_strength = 8
-            pattern_type = "strong_bearish"
-            signal_direction = "strong_bearish"
-
-        # MODERATE PATTERNS (with strict candle type validation)
-        elif is_bullish_candle and body_ratio >= 0.4:
-            patterns_detected.append("moderate_bullish")
-            pattern_strength = 5
-            pattern_type = "moderate_bullish"
-            signal_direction = "bullish"
-        elif is_bearish_candle and body_ratio >= 0.4:
-            patterns_detected.append("moderate_bearish")
-            pattern_strength = 5
-            pattern_type = "moderate_bearish"
-            signal_direction = "bearish"
-        # WEAK PATTERNS (for small bodies)
-        elif is_bullish_candle and body_ratio >= 0.1:
-            patterns_detected.append("weak_bullish")
-            pattern_strength = 3
-            pattern_type = "weak_bullish"
-            signal_direction = "bullish"
-        elif is_bearish_candle and body_ratio >= 0.1:
-            patterns_detected.append("weak_bearish")
-            pattern_strength = 3
-            pattern_type = "weak_bearish"
-            signal_direction = "bearish"
+        # Gate directional patterns behind body significance analysis
+        if not body_analysis["allow_directional_bias"]:
+            # Force neutral classification for insufficient bodies
+            if body_analysis["is_doji"]:
+                pattern_type = "doji"
+                signal_direction = "doji"
+                pattern_strength = 3
+                patterns_detected.append("doji")
+            elif body_analysis["is_spinning_top"]:
+                pattern_type = "spinning_top"
+                signal_direction = "spinning_top"
+                pattern_strength = 4
+                patterns_detected.append("spinning_top")
+            else:
+                pattern_type = "insufficient_body"
+                signal_direction = "neutral"
+                pattern_strength = 1
+                patterns_detected.append("insufficient_body")
         else:
-            # For very small bodies or equal open/close
-            pattern_strength = 2
-            pattern_type = "indecisive"
-            signal_direction = "neutral"
+            # Apply exceptional body confidence boost if applicable
+            confidence_multiplier = body_analysis.get("confidence_boost", 1.0)
+
+            # BEARISH MARABOZU - Most bearish pattern
+            if (is_bearish_candle and 
+                body_ratio >= 0.95 and  # Body is 95%+ of candle
+                upper_shadow_pct <= 0.02 and  # Upper shadow ≤2% of range
+                lower_shadow_pct <= 0.02):  # Lower shadow ≤2% of range
+                patterns_detected.append("bearish_marabozu")
+                pattern_strength = int(10 * confidence_multiplier)
+                pattern_type = "bearish_marabozu"
+                signal_direction = "strong_bearish"
+
+            # SHOOTING STAR - Second most bearish pattern  
+            elif (upper_shadow_ratio >= 2.0 and  # Upper shadow ≥2x body
+                  lower_shadow_ratio <= 0.5 and  # Lower shadow ≤50% of body
+                  body_ratio <= 0.3):  # Small body (≤30% of range)
+                patterns_detected.append("shooting_star")
+                pattern_strength = int(9 * confidence_multiplier)
+                pattern_type = "shooting_star"
+                signal_direction = "strong_bearish"
+
+            # BULLISH MARABOZU - Most bullish pattern
+            elif (is_bullish_candle and
+                  body_ratio >= 0.95 and  # Body is 95%+ of candle  
+                  upper_shadow_pct <= 0.02 and  # Upper shadow ≤2% of range
+                  lower_shadow_pct <= 0.02):  # Lower shadow ≤2% of range
+                patterns_detected.append("bullish_marabozu")
+                pattern_strength = int(10 * confidence_multiplier)
+                pattern_type = "bullish_marabozu"
+                signal_direction = "strong_bullish"
+
+            # ENHANCED HAMMER - Bullish reversal at support
+            elif (lower_shadow_ratio >= 2.0 and  # Lower shadow ≥2x body
+                  upper_shadow_ratio <= 0.5 and  # Upper shadow ≤50% of body
+                  body_ratio <= 0.3):  # Small body
+                patterns_detected.append("hammer")
+                pattern_strength = int(7 * confidence_multiplier)
+                pattern_type = "hammer"
+                signal_direction = "bullish"
+
+            # STRONG BULLISH CANDLE - Enhanced detection (ONLY for bullish candles)
+            elif (is_bullish_candle and body_ratio >= 0.7):
+                patterns_detected.append("strong_bullish")
+                pattern_strength = int(8 * confidence_multiplier)
+                pattern_type = "strong_bullish"
+                signal_direction = "strong_bullish"
+
+            # STRONG BEARISH CANDLE - Enhanced detection (ONLY for bearish candles)
+            elif (is_bearish_candle and body_ratio >= 0.7):
+                patterns_detected.append("strong_bearish")
+                pattern_strength = int(8 * confidence_multiplier)
+                pattern_type = "strong_bearish"
+                signal_direction = "strong_bearish"
+
+            # MODERATE PATTERNS (with strict candle type validation)
+            elif is_bullish_candle and body_ratio >= 0.4:
+                patterns_detected.append("moderate_bullish")
+                pattern_strength = int(5 * confidence_multiplier)
+                pattern_type = "moderate_bullish"
+                signal_direction = "bullish"
+            elif is_bearish_candle and body_ratio >= 0.4:
+                patterns_detected.append("moderate_bearish")
+                pattern_strength = int(5 * confidence_multiplier)
+                pattern_type = "moderate_bearish"
+                signal_direction = "bearish"
+            # WEAK PATTERNS (for small bodies)
+            elif is_bullish_candle and body_ratio >= 0.1:
+                patterns_detected.append("weak_bullish")
+                pattern_strength = int(3 * confidence_multiplier)
+                pattern_type = "weak_bullish"
+                signal_direction = "bullish"
+            elif is_bearish_candle and body_ratio >= 0.1:
+                patterns_detected.append("weak_bearish")
+                pattern_strength = int(3 * confidence_multiplier)
+                pattern_type = "weak_bearish"
+                signal_direction = "bearish"
+            else:
+                # For very small bodies or equal open/close (but significant enough to allow directional bias)
+                if is_bullish_candle:
+                    pattern_strength = int(2 * confidence_multiplier)
+                    pattern_type = "weak_bullish"
+                    signal_direction = "weak_bullish"
+                elif is_bearish_candle:
+                    pattern_strength = int(2 * confidence_multiplier)
+                    pattern_type = "weak_bearish"
+                    signal_direction = "weak_bearish"
+                else:
+                    pattern_strength = 2
+                    pattern_type = "indecisive"
+                    signal_direction = "neutral"
 
         # Calculate trend context for pattern validation
         trend_context = self._analyze_trend_context(data)
@@ -754,6 +1061,10 @@ class TechnicalIndicators:
             "upper_shadow": upper_shadow,
             "lower_shadow": lower_shadow,
             "candle_range": candle_range,
+            # Body significance analysis data
+            "body_significance": body_analysis,
+            "timeframe": timeframe,
+            "atr_value": atr_value,
         }
 
         logger.debug(
@@ -810,8 +1121,8 @@ class TechnicalIndicators:
 
         logger.debug("Analyzing candlestick patterns", data_points=len(data))
 
-        # Use advanced pattern detection
-        advanced_analysis = self.detect_advanced_candlestick_patterns(data)
+        # Use advanced pattern detection (default to 1h timeframe for backward compatibility)
+        advanced_analysis = self.detect_advanced_candlestick_patterns(data, timeframe="1h")
         
         # Map to legacy format for backward compatibility
         signal_direction = advanced_analysis["signal_direction"]
@@ -1017,8 +1328,8 @@ class TechnicalIndicators:
         try:
             from src.core.models import CandlestickFormation
             
-            # Get advanced pattern analysis
-            pattern_analysis = self.detect_advanced_candlestick_patterns(data)
+            # Get advanced pattern analysis (default to 1h timeframe for backward compatibility)
+            pattern_analysis = self.detect_advanced_candlestick_patterns(data, timeframe="1h")
             
             if not pattern_analysis or pattern_analysis.get("primary_pattern") == "none":
                 return None
@@ -1227,3 +1538,339 @@ class TechnicalIndicators:
             reasoning += " Volume does not confirm the pattern, reducing its reliability."
         
         return reasoning
+
+    # Enhanced V2 Technical Analysis Methods
+    def calculate_trend_strength(self, data: List[OHLCV]) -> float:
+        """
+        Calculate multi-factor trend strength score (0-100).
+        
+        Combines price momentum, volume confirmation, and trend consistency
+        to provide a comprehensive trend strength assessment.
+        
+        Args:
+            data: List of OHLCV data points
+            
+        Returns:
+            Trend strength score from 0 (no trend) to 100 (very strong trend)
+        """
+        if len(data) < 10:
+            return 0.0
+            
+        logger.debug("Calculating trend strength", data_points=len(data))
+        
+        df = self._to_dataframe(data)
+        closes = df["close"].values
+        volumes = df["volume"].values
+        
+        # Factor 1: Price momentum (30% weight)
+        momentum_periods = min(10, len(closes))
+        price_change = (closes[-1] - closes[-momentum_periods]) / closes[-momentum_periods]
+        momentum_score = min(100, abs(price_change) * 100 * 5)  # Scale to 0-100
+        
+        # Factor 2: Trend consistency (40% weight)
+        # Count periods moving in same direction
+        direction_changes = 0
+        for i in range(1, len(closes)):
+            if i > 1:
+                prev_direction = closes[i-1] > closes[i-2]
+                curr_direction = closes[i] > closes[i-1]
+                if prev_direction != curr_direction:
+                    direction_changes += 1
+        
+        consistency_ratio = 1 - (direction_changes / max(1, len(closes) - 2))
+        consistency_score = consistency_ratio * 100
+        
+        # Factor 3: Volume confirmation (30% weight)
+        if len(volumes) >= 5:
+            recent_vol_avg = np.mean(volumes[-5:])
+            older_vol_avg = np.mean(volumes[-10:-5]) if len(volumes) >= 10 else recent_vol_avg
+            volume_trend = recent_vol_avg / max(older_vol_avg, 1)
+            volume_score = min(100, volume_trend * 50)  # Scale to 0-100
+        else:
+            volume_score = 50  # Neutral when insufficient data
+        
+        # Weighted combination
+        trend_strength = (
+            momentum_score * 0.3 +
+            consistency_score * 0.4 +
+            volume_score * 0.3
+        )
+        
+        return max(0, min(100, trend_strength))
+    
+    def is_trending_market(self, data: List[OHLCV], min_trend_strength: int = 40) -> bool:
+        """
+        Determine if market is in a trending state vs sideways/choppy.
+        
+        Args:
+            data: List of OHLCV data points
+            min_trend_strength: Minimum trend strength threshold (0-100)
+            
+        Returns:
+            True if market is trending, False if sideways/choppy
+        """
+        trend_strength = self.calculate_trend_strength(data)
+        return trend_strength >= min_trend_strength
+    
+    def calculate_trend_quality(self, data: List[OHLCV]) -> float:
+        """
+        Calculate comprehensive trend quality score (0-100).
+        
+        Combines trend strength, duration, EMA alignment, and market structure
+        to assess overall trend quality.
+        
+        Args:
+            data: List of OHLCV data points
+            
+        Returns:
+            Trend quality score from 0 (poor) to 100 (excellent)
+        """
+        if len(data) < 15:
+            return 0.0
+            
+        logger.debug("Calculating trend quality", data_points=len(data))
+        
+        # Component 1: Base trend strength (40% weight)
+        trend_strength = self.calculate_trend_strength(data)
+        
+        # Component 2: Trend duration (20% weight)
+        trend_duration = self.calculate_trend_duration(data)
+        duration_score = min(100, trend_duration * 10)  # Scale duration periods
+        
+        # Component 3: EMA alignment (20% weight)
+        ema_alignment = self.detect_ema_alignment(data)
+        if ema_alignment in ["strong_bullish", "strong_bearish"]:
+            alignment_score = 100
+        elif ema_alignment in ["bullish", "bearish"]:
+            alignment_score = 70
+        else:
+            alignment_score = 30
+        
+        # Component 4: Market structure (20% weight)
+        structure = self.calculate_market_structure(data)
+        structure_score = structure.get("structure_strength", 50)
+        
+        # Weighted combination using V2 constants
+        from src.core.constants import TradingConstants
+        trend_quality = (
+            trend_strength * (TradingConstants.V2_TREND_STRENGTH_WEIGHT or 0.4) +
+            duration_score * (TradingConstants.V2_TREND_DURATION_WEIGHT or 0.2) +
+            alignment_score * (TradingConstants.V2_EMA_ALIGNMENT_WEIGHT or 0.2) +
+            structure_score * (TradingConstants.V2_MARKET_STRUCTURE_WEIGHT or 0.2)
+        )
+        
+        return max(0, min(100, trend_quality))
+    
+    def detect_ema_alignment(self, data: List[OHLCV]) -> str:
+        """
+        Detect EMA alignment patterns (9>15>50 for bullish, 9<15<50 for bearish).
+        
+        Args:
+            data: List of OHLCV data points or dict with pre-calculated EMAs
+            
+        Returns:
+            Alignment pattern: 'strong_bullish', 'bullish', 'strong_bearish', 'bearish', 'mixed', 'neutral'
+        """
+        # Handle both OHLCV data and pre-calculated EMA dict
+        if isinstance(data, dict):
+            ema_9 = data.get("ema_9")
+            ema_15 = data.get("ema_15")
+            ema_50 = data.get("ema_50")
+            current_price = data.get("current_price")
+        else:
+            # Calculate EMAs from OHLCV data
+            if len(data) < 50:
+                return "neutral"
+                
+            ema_9_values = self.calculate_ema(data, 9)
+            ema_15_values = self.calculate_ema(data, 15)
+            ema_50_values = self.calculate_ema(data, 50)
+            
+            ema_9 = ema_9_values[-1]
+            ema_15 = ema_15_values[-1]
+            ema_50 = ema_50_values[-1]
+            current_price = data[-1].close
+        
+        if not all([ema_9, ema_15, ema_50, current_price]):
+            return "neutral"
+        
+        # Perfect bullish alignment: Price > 9 EMA > 15 EMA > 50 EMA
+        if current_price > ema_9 > ema_15 > ema_50:
+            # Check separation strength
+            sep_9_15 = (ema_9 - ema_15) / ema_15 * 100
+            sep_15_50 = (ema_15 - ema_50) / ema_50 * 100
+            if sep_9_15 > 1.0 and sep_15_50 > 1.0:
+                return "strong_bullish"
+            else:
+                return "bullish"
+        
+        # Perfect bearish alignment: Price < 9 EMA < 15 EMA < 50 EMA
+        elif current_price < ema_9 < ema_15 < ema_50:
+            # Check separation strength
+            sep_9_15 = (ema_15 - ema_9) / ema_9 * 100
+            sep_15_50 = (ema_50 - ema_15) / ema_15 * 100
+            if sep_9_15 > 1.0 and sep_15_50 > 1.0:
+                return "strong_bearish"
+            else:
+                return "bearish"
+        
+        # Partial alignments
+        elif ema_9 > ema_15 > ema_50:
+            return "bullish"  # EMAs aligned bullish but price may be below
+        elif ema_9 < ema_15 < ema_50:
+            return "bearish"  # EMAs aligned bearish but price may be above
+        
+        # Mixed or unclear alignment
+        else:
+            return "mixed"
+    
+    def calculate_volatility_percentile(self, data: List[OHLCV], lookback_periods: int = 50) -> float:
+        """
+        Calculate ATR-based volatility percentile (0-1 range).
+        
+        Compares current ATR to historical ATR distribution to determine
+        if current volatility is high or low relative to recent history.
+        
+        Args:
+            data: List of OHLCV data points
+            lookback_periods: Periods to use for percentile calculation
+            
+        Returns:
+            Volatility percentile from 0 (low volatility) to 1 (high volatility)
+        """
+        if len(data) < max(14, lookback_periods):
+            return 0.5  # Neutral when insufficient data
+            
+        logger.debug("Calculating volatility percentile", data_points=len(data), lookback=lookback_periods)
+        
+        # Calculate ATR values
+        atr_values = self.calculate_atr(data, period=14)
+        
+        # Filter out None values and get recent ATR data
+        valid_atr = [atr for atr in atr_values if atr is not None]
+        if not valid_atr:
+            return 0.5
+            
+        # Use lookback periods for percentile calculation
+        recent_atr = valid_atr[-lookback_periods:] if len(valid_atr) >= lookback_periods else valid_atr
+        current_atr = valid_atr[-1]
+        
+        # Calculate percentile rank
+        values_below = sum(1 for atr in recent_atr if atr < current_atr)
+        percentile = values_below / len(recent_atr)
+        
+        return percentile
+    
+    def calculate_market_structure(self, data: List[OHLCV]) -> Dict[str, Any]:
+        """
+        Analyze market structure including swing highs/lows and trend patterns.
+        
+        Args:
+            data: List of OHLCV data points
+            
+        Returns:
+            Dictionary with market structure analysis
+        """
+        if len(data) < 10:
+            return {
+                "swing_highs": [],
+                "swing_lows": [],
+                "higher_highs_count": 0,
+                "lower_lows_count": 0,
+                "trend_structure": "unclear",
+                "structure_strength": 0
+            }
+            
+        logger.debug("Analyzing market structure", data_points=len(data))
+        
+        df = self._to_dataframe(data)
+        highs = df["high"].values
+        lows = df["low"].values
+        
+        # Detect swing points using configurable period
+        from src.core.constants import TradingConstants
+        swing_period = getattr(TradingConstants, 'V2_SWING_DETECTION_PERIOD', 5)
+        
+        swing_highs = self._find_peaks(highs, distance=swing_period)
+        swing_lows = self._find_peaks(-lows, distance=swing_period)  # Invert for troughs
+        
+        # Analyze higher highs and lower lows
+        higher_highs_count = 0
+        lower_lows_count = 0
+        
+        # Count higher highs
+        if len(swing_highs) >= 2:
+            for i in range(1, len(swing_highs)):
+                if highs[swing_highs[i]] > highs[swing_highs[i-1]]:
+                    higher_highs_count += 1
+        
+        # Count lower lows
+        if len(swing_lows) >= 2:
+            for i in range(1, len(swing_lows)):
+                if lows[swing_lows[i]] < lows[swing_lows[i-1]]:
+                    lower_lows_count += 1
+        
+        # Determine trend structure
+        hh_threshold = getattr(TradingConstants, 'V2_HIGHER_HIGHS_THRESHOLD', 2)
+        ll_threshold = getattr(TradingConstants, 'V2_LOWER_LOWS_THRESHOLD', 2)
+        
+        if higher_highs_count >= hh_threshold:
+            trend_structure = "bullish"
+        elif lower_lows_count >= ll_threshold:
+            trend_structure = "bearish"
+        else:
+            trend_structure = "sideways"
+        
+        # Calculate structure strength (0-100)
+        max_swings = max(len(swing_highs), len(swing_lows))
+        if max_swings > 0:
+            if trend_structure == "bullish":
+                structure_strength = min(100, (higher_highs_count / max_swings) * 100)
+            elif trend_structure == "bearish":
+                structure_strength = min(100, (lower_lows_count / max_swings) * 100)
+            else:
+                structure_strength = 50  # Neutral for sideways
+        else:
+            structure_strength = 0
+        
+        return {
+            "swing_highs": [int(idx) for idx in swing_highs],
+            "swing_lows": [int(idx) for idx in swing_lows],
+            "higher_highs_count": higher_highs_count,
+            "lower_lows_count": lower_lows_count,
+            "trend_structure": trend_structure,
+            "structure_strength": structure_strength
+        }
+    
+    def calculate_trend_duration(self, data: List[OHLCV]) -> int:
+        """
+        Calculate trend duration in number of periods.
+        
+        Tracks how long the current trend has been in place by analyzing
+        consecutive periods moving in the same direction.
+        
+        Args:
+            data: List of OHLCV data points
+            
+        Returns:
+            Number of periods the current trend has lasted
+        """
+        if len(data) < 3:
+            return 0
+            
+        closes = [candle.close for candle in data]
+        
+        # Determine current trend direction
+        current_direction = closes[-1] > closes[-2]
+        
+        # Count consecutive periods in same direction
+        duration = 1  # Current period
+        
+        for i in range(len(closes) - 2, 0, -1):
+            period_direction = closes[i] > closes[i-1]
+            if period_direction == current_direction:
+                duration += 1
+            else:
+                break  # Trend change detected
+        
+        return duration

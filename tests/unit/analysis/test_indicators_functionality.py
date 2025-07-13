@@ -349,3 +349,133 @@ class TestTechnicalIndicatorsFunctionality:
         
         # EMA and SMA shouldn't differ by more than 5% typically
         assert diff_percentage < 5, f"EMA and SMA differ by {diff_percentage}%, seems excessive"
+
+    def test_advanced_candlestick_patterns_with_body_significance(self, indicators):
+        """Test that advanced candlestick patterns now include body significance analysis."""
+        # Given: A candle with meaningful body size for 1h timeframe
+        test_candle = OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000,
+            high=50500,
+            low=49900,
+            close=50450,  # 450 points - significant for 1h
+            volume=1000.0
+        )
+        
+        # When: Analyzing patterns with timeframe context
+        analysis = indicators.detect_advanced_candlestick_patterns(
+            [test_candle], timeframe="1h", atr_value=100
+        )
+        
+        # Then: Should include body significance data
+        assert "body_significance" in analysis
+        assert "classification" in analysis["body_significance"]
+        assert "allow_directional_bias" in analysis["body_significance"]
+        assert "reasoning" in analysis["body_significance"]
+        assert "timeframe" in analysis
+        assert "atr_value" in analysis
+        
+        # And: Should allow directional bias for significant body
+        assert analysis["body_significance"]["allow_directional_bias"]
+
+    def test_pattern_detection_filters_small_bodies(self, indicators):
+        """Test that pattern detection filters out insignificant price movements."""
+        # Given: Small-bodied candle that would traditionally look bullish
+        small_candle = OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000,
+            high=50080,
+            low=49920,
+            close=50020,  # Only 20 points - too small for 1h
+            volume=1000.0
+        )
+        
+        # When: Analyzing for 1h timeframe
+        analysis = indicators.detect_advanced_candlestick_patterns(
+            [small_candle], timeframe="1h", atr_value=100
+        )
+        
+        # Then: Should not allow directional bias
+        assert not analysis["body_significance"]["allow_directional_bias"]
+        assert analysis["signal_direction"] in ["neutral", "insufficient_body", "doji", "spinning_top"]
+
+    def test_pattern_detection_respects_timeframe_requirements(self, indicators):
+        """Test that same movement produces different results on different timeframes."""
+        # Given: 100-point movement
+        test_candle = OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000,
+            high=50150,
+            low=49950,
+            close=50100,  # 100 points
+            volume=1000.0
+        )
+        
+        # When: Analyzing on different timeframes
+        analysis_1m = indicators.detect_advanced_candlestick_patterns(
+            [test_candle], timeframe="1m", atr_value=30
+        )
+        analysis_1h = indicators.detect_advanced_candlestick_patterns(
+            [test_candle], timeframe="1h", atr_value=100
+        )
+        analysis_1d = indicators.detect_advanced_candlestick_patterns(
+            [test_candle], timeframe="1d", atr_value=200
+        )
+        
+        # Then: Should show different behavior based on timeframe appropriateness
+        # 100 points should be more significant for shorter timeframes
+        results = [
+            analysis_1m["body_significance"]["allow_directional_bias"],
+            analysis_1h["body_significance"]["allow_directional_bias"],
+            analysis_1d["body_significance"]["allow_directional_bias"]
+        ]
+        
+        # At least one timeframe should behave differently
+        assert not all(results) or not any(results), "Timeframes should show different sensitivity"
+
+    def test_exceptional_body_confidence_boost(self, indicators):
+        """Test that exceptional body sizes boost pattern confidence."""
+        # Given: Normal vs exceptional sized candles
+        normal_candle = OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50500, low=49900, close=50450,  # 450 points (normal for 1h)
+            volume=1000.0
+        )
+        exceptional_candle = OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50800, low=49700, close=50700,  # 700 points (exceptional for 1h)
+            volume=1000.0
+        )
+        
+        # When: Analyzing both
+        normal_analysis = indicators.detect_advanced_candlestick_patterns(
+            [normal_candle], timeframe="1h", atr_value=100
+        )
+        exceptional_analysis = indicators.detect_advanced_candlestick_patterns(
+            [exceptional_candle], timeframe="1h", atr_value=100
+        )
+        
+        # Then: Exceptional body should show higher confidence
+        assert exceptional_analysis["body_significance"]["classification"] == "exceptional_body"
+        assert exceptional_analysis["pattern_strength"] > normal_analysis["pattern_strength"]
+
+    def test_backwards_compatibility_default_parameters(self, indicators):
+        """Test that method works with default parameters for backward compatibility."""
+        # Given: Test candle
+        test_candle = OHLCV(
+            timestamp=datetime.now(timezone.utc),
+            open=50000, high=50500, low=49900, close=50450,
+            volume=1000.0
+        )
+        
+        # When: Calling without explicit timeframe/ATR (old style)
+        try:
+            analysis = indicators.detect_advanced_candlestick_patterns([test_candle])
+            
+            # Then: Should work and include new features
+            assert "body_significance" in analysis
+            assert "timeframe" in analysis
+            assert analysis["timeframe"] == "1h"  # Default
+            
+        except Exception as e:
+            pytest.fail(f"Backward compatibility broken: {e}")

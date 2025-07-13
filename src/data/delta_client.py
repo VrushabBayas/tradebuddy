@@ -469,7 +469,7 @@ class DeltaExchangeClient:
         self,
         symbol: str,
         timeframe: str,
-        limit: int = 100
+        limit: int = 200
     ) -> MarketData:
         """
         Get comprehensive market data for analysis.

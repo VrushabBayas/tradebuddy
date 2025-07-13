@@ -38,6 +38,7 @@ class StrategyType(str, Enum):
 
     SUPPORT_RESISTANCE = "support_resistance"
     EMA_CROSSOVER = "ema_crossover"
+    EMA_CROSSOVER_V2 = "ema_crossover_v2"
     COMBINED = "combined"
 
 
@@ -360,6 +361,33 @@ class EMAStrategyConfig(BaseModel):
         default=1.5, ge=1.0, le=3.0, description="ATR stop loss multiplier"
     )
 
+    # V2 Enhanced Trend Analysis Parameters
+    min_trend_strength: int = Field(
+        default=40, ge=0, le=100, description="Minimum trend strength required (0-100)"
+    )
+    min_trend_quality: int = Field(
+        default=70, ge=0, le=100, description="Minimum trend quality required (0-100)"
+    )
+    min_trend_duration: int = Field(
+        default=3, ge=1, le=20, description="Minimum trend duration in periods"
+    )
+
+    # V2 Market Structure Parameters
+    swing_detection_period: int = Field(
+        default=5, ge=3, le=15, description="Period for swing high/low detection"
+    )
+    structure_lookback_periods: int = Field(
+        default=10, ge=5, le=30, description="Lookback periods for market structure analysis"
+    )
+
+    # V2 Volatility Assessment
+    volatility_threshold: float = Field(
+        default=0.7, ge=0.5, le=1.0, description="High volatility threshold (0-1 percentile)"
+    )
+    atr_lookback_periods: int = Field(
+        default=50, ge=20, le=100, description="ATR lookback periods for volatility percentile"
+    )
+
     model_config = ConfigDict(use_enum_values=True)
 
 
@@ -460,7 +488,7 @@ class RealTimeConfig(BaseModel):
 
     # Real-time specific settings
     historical_candles: int = Field(
-        default=45, ge=20, le=100, description="Historical candles to preload"
+        default=100, ge=20, le=200, description="Historical candles to preload"
     )
     max_analysis_count: int = Field(
         default=50, ge=1, le=200, description="Maximum number of analyses per session"
@@ -505,7 +533,7 @@ class MonitoringConfig(BaseModel):
         default=100, ge=50, le=200, description="OHLCV buffer size for analysis"
     )
     historical_candles: int = Field(
-        default=50, ge=30, le=100, description="Historical candles to preload"
+        default=100, ge=30, le=200, description="Historical candles to preload"
     )
 
     model_config = ConfigDict(use_enum_values=True)

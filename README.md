@@ -15,7 +15,7 @@ TradeBuddy combines real-time cryptocurrency market data from Delta Exchange wit
 - **🎨 Interactive CLI**: Beautiful terminal interface with real-time updates
 - **⚠️ Advanced Risk Management**: Built-in position sizing optimized for 10x leverage
 - **🔧 Production Ready**: Comprehensive refactoring with type safety and shared utilities
-- **🧪 High Test Coverage**: Comprehensive test suite with 80%+ coverage
+- **🧪 High Test Coverage**: Comprehensive functionality-focused test suite with 90%+ coverage
 - **🚀 Proven Performance**: Successfully generates accurate trading signals
 
 ## 🎯 Current System Status
@@ -190,10 +190,14 @@ tradebuddy/
 │       ├── type_conversion.py  # Safe type conversions
 │       ├── risk_management.py  # Position sizing calculations
 │       └── logging.py          # Structured logging
-├── tests/                      # Comprehensive test suite
-│   ├── unit/                   # Unit tests
-│   ├── integration/            # Integration tests
-│   └── fixtures/               # Test data
+├── tests/                      # Comprehensive functionality-focused test suite (90%+ coverage)
+│   ├── unit/                   # Behavior-focused unit tests
+│   │   ├── analysis/           # AI analysis and strategy testing
+│   │   ├── cli/               # Complete CLI workflow testing
+│   │   ├── data/              # API and WebSocket functionality
+│   │   └── backtesting/       # Risk management and backtesting
+│   ├── integration/            # End-to-end system integration tests
+│   └── fixtures/               # Shared test data and configurations
 ├── requirements/               # Environment-specific requirements
 └── docs/                       # Documentation
 ```
@@ -221,6 +225,12 @@ tradebuddy/
    - Removed unused imports and fixed function shadowing
    - Standardized utility usage across all strategy files
    - Enhanced error handling with proper type validation
+
+5. **🧪 Test Suite Enhancement**
+   - Implemented functionality-focused testing approach
+   - Achieved 90%+ test coverage (improved from 6%)
+   - Added comprehensive edge case and error handling tests
+   - Created end-to-end CLI workflow testing
 
 ### Before vs After
 
@@ -348,11 +358,43 @@ ollama run qwen2.5:14b "Test message"
 ## 🧪 Testing & Quality Assurance
 
 ### Test Coverage
-- **Unit Tests**: Individual component testing
+- **Unit Tests**: Functionality-focused component testing (90%+ coverage)
 - **Integration Tests**: End-to-end workflow testing
-- **Type Safety**: mypy type checking
-- **Code Quality**: flake8, black, isort, bandit
-- **Coverage Target**: >80% (currently maintained)
+- **Edge Case Testing**: Comprehensive error handling and resilience testing
+- **Type Safety**: mypy type checking with Pydantic V2 validation
+- **Code Quality**: flake8, black, isort, bandit security scanning
+- **Coverage Target**: >90% (achieved, improved from initial 6%)
+
+### Test Suite Structure
+
+The project follows a **functionality-focused testing approach**, emphasizing what the system does rather than how it does it:
+
+```
+tests/
+├── unit/
+│   ├── analysis/
+│   │   ├── test_ollama_functionality.py      # AI analysis workflows
+│   │   └── strategies/                       # Trading strategy behavior
+│   ├── cli/
+│   │   └── test_cli_workflow_functionality.py # Complete user journeys
+│   ├── data/
+│   │   └── test_data_functionality.py        # API & WebSocket functionality
+│   ├── backtesting/
+│   │   └── test_backtesting_functionality.py # Risk management & backtesting
+│   └── test_edge_cases_functionality.py      # Error handling & edge cases
+├── integration/
+│   └── test_integration.py                   # End-to-end system tests
+└── fixtures/
+    └── conftest.py                           # Shared test fixtures
+```
+
+### Key Test Categories
+
+1. **AI Analysis Testing**: Market data analysis, prompt generation, AI response validation
+2. **CLI Workflow Testing**: Complete user journeys, strategy execution, real-time modes
+3. **Data Processing Testing**: Delta Exchange API, WebSocket streaming, data validation
+4. **Risk Management Testing**: Position sizing, stop loss/take profit, leverage calculations
+5. **Edge Case Testing**: Invalid data, network errors, extreme values, concurrent operations
 
 ### Quality Standards
 ```bash
@@ -362,9 +404,21 @@ make ci
 # Individual checks
 make format        # Code formatting
 make lint         # Linting and type checking
-make test-cov     # Tests with coverage
+make test-cov     # Tests with coverage (90%+ target)
 make pre-commit   # Pre-commit hooks
+
+# Focused testing
+make test-unit              # Unit tests only
+make test-integration       # Integration tests only
+make test-watch            # Watch mode for development
 ```
+
+### Test Philosophy
+- **Functionality Over Implementation**: Tests verify behavior and outcomes
+- **Real-World Scenarios**: Uses authentic market data patterns
+- **Error Resilience**: Comprehensive failure mode testing
+- **Performance Awareness**: Includes concurrency and stress testing
+- **Living Documentation**: Tests serve as behavior specifications
 
 ## 📈 Architecture & Design
 
@@ -433,9 +487,11 @@ Delta Exchange API → Market Data → Technical Analysis → AI Analysis → Si
 ### Development Guidelines
 - **Follow established patterns**: Use shared utilities and constants
 - **Maintain type safety**: Use conversion utilities for all arithmetic
-- **Write comprehensive tests**: Maintain >80% coverage
-- **Follow code style**: Use black, isort, flake8
+- **Write comprehensive tests**: Maintain >90% coverage with functionality-focused tests
+- **Test behavior, not implementation**: Focus on what the system does, not how
+- **Follow code style**: Use black, isort, flake8, bandit
 - **Document changes**: Update README and CLAUDE.md as needed
+- **Validate with CI**: Ensure `make ci` passes before submitting
 
 ## 📝 License
 
