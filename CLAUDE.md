@@ -29,10 +29,12 @@ TradeBuddy is a **production-ready** AI-powered trading signal analysis system t
 
 1. **Support & Resistance Analysis** - Key price level identification
 2. **EMA Crossover Analysis** - Trend change detection with 9/15 EMA
-3. **Combined Strategy** - High-confidence signals from multiple strategies
-4. **Real-Time Analysis ⭐** - Live market streaming (5-60 minutes)
-5. **Market Monitoring 🔄** - Continuous monitoring with automated alerts
-6. **Exit** - Clean application termination
+3. **EMA Crossover V2 Analysis** - Enhanced EMA strategy with trend filtering and market structure analysis
+4. **Combined Strategy** - High-confidence signals from multiple strategies
+5. **Real-Time Analysis ⭐** - Live market streaming (5-60 minutes)
+6. **Market Monitoring 🔄** - Continuous monitoring with automated alerts
+7. **Backtesting Mode** - Historical strategy performance analysis
+8. **Exit** - Clean application termination
 
 ## Architecture Overview
 
@@ -40,19 +42,34 @@ TradeBuddy is a **production-ready** AI-powered trading signal analysis system t
 ```
 src/
 ├── cli/
-│   ├── main.py           # Main CLI application (389 lines)
+│   ├── main.py           # Main CLI application with 8 operation modes
 │   ├── realtime.py       # Real-time analysis & monitoring (785 lines)
 │   └── displays.py       # Centralized display utilities (271 lines)
 ├── core/
-│   ├── models.py         # Pydantic models with RealTimeConfig & MonitoringConfig
+│   ├── models.py         # Pydantic models with enhanced strategy configs
 │   ├── config.py         # Environment-based configuration
 │   └── constants.py      # Trading constants and parameters
 ├── data/
-│   ├── delta_client.py   # Delta Exchange API client
+│   ├── delta_client.py   # Delta Exchange API client (200 candle default)
 │   └── websocket_client.py # WebSocket streaming client
-└── analysis/
-    ├── strategies/       # Trading strategy implementations
-    └── indicators.py     # Technical indicator calculations
+├── analysis/
+│   ├── strategies/       # Four trading strategy implementations
+│   │   ├── ema_crossover.py     # Original EMA crossover (9/15)
+│   │   ├── ema_crossover_v2.py  # Enhanced with 50 EMA trend filter
+│   │   ├── support_resistance.py # Price level analysis
+│   │   └── combined.py          # Multi-strategy confluence
+│   ├── indicators.py     # Technical indicator calculations
+│   ├── ema_analysis.py   # Advanced EMA trend analysis
+│   ├── market_context.py # Market structure analysis
+│   └── scoring/          # Signal scoring framework
+│       └── signal_scorer.py # Configurable scoring system
+├── backtesting/
+│   ├── engine.py         # Backtesting engine
+│   └── models.py         # Backtesting configuration
+└── utils/
+    ├── data_helpers.py   # Safe data access utilities
+    ├── type_conversion.py # Type safety conversions
+    └── risk_management.py # Position sizing calculations
 ```
 
 ### Key Components
@@ -103,14 +120,14 @@ make run-demo                  # System demonstration
 
 ## Real-Time Features
 
-### Live Market Analysis (Option 4)
+### Live Market Analysis (Option 5)
 ```bash
 # Interactive session configuration:
-Strategy: EMA Crossover or Combined Strategy
+Strategy: EMA Crossover, EMA Crossover V2, or Combined Strategy
 Symbol: BTCUSDT (default), ETHUSDT, SOLUSDT, ADAUSDT, DOGEUSDT  
 Timeframe: 1m (default for real-time)
 Duration: 5-60 minutes
-Buffer Size: 20-100 candles
+Buffer Size: 20-200 candles (default: 100)
 ```
 
 **Features**:
@@ -120,10 +137,10 @@ Buffer Size: 20-100 candles
 - Live signal generation with confidence scoring
 - Interactive session with progress tracking
 
-### Continuous Market Monitoring (Option 5)
+### Continuous Market Monitoring (Option 6)
 ```bash
 # Multi-symbol monitoring configuration:
-Strategy: EMA Crossover or Combined Strategy
+Strategy: EMA Crossover, EMA Crossover V2, or Combined Strategy
 Symbols: Multi-select (comma-separated, e.g., 1,2,3)
 Signal Threshold: 5-10 confidence level for alerts
 Refresh Interval: 30-300 seconds between analyses
@@ -151,29 +168,39 @@ Display: Compact or detailed alert format
 - Signal history and session statistics
 - Display customization options
 
-## Recent Refactoring (Latest Changes)
+## Recent Major Updates (Latest Changes)
 
-### Modular Architecture Implementation
-- **Extracted Real-Time Module**: `src/cli/realtime.py` (785 lines)
-  - Complete real-time streaming functionality
-  - Monitoring mode with multi-symbol support
-  - Type-safe configuration management
+### EMA Crossover V2 Strategy Implementation
+- **Enhanced EMA Strategy**: New `ema_crossover_v2.py` with advanced features
+  - 50 EMA trend filter for higher quality signals
+  - Multi-factor trend strength scoring (0-100 scale)
+  - Market structure analysis with swing detection
+  - Volatility-aware signal generation
+  - Enhanced confidence scoring system
 
-- **Centralized Display System**: `src/cli/displays.py` (271 lines)  
-  - Reusable UI components for consistent styling
-  - Table creation utilities and panel formatting
-  - Risk management display helpers
+- **Signal Scoring Framework**: New modular scoring system (`src/analysis/scoring/`)
+  - Configurable signal assessment components
+  - Weighted multi-factor analysis
+  - Reusable across all strategies
+  - Performance and risk metrics integration
 
-- **Streamlined Main CLI**: `src/cli/main.py` (389 lines)
-  - 36% reduction from 609 lines (220 lines removed)
-  - Focused on application flow and orchestration
-  - Clean separation of concerns
+- **Market Analysis Modules**: 
+  - `ema_analysis.py`: Advanced EMA trend analysis
+  - `market_context.py`: Market structure and trend quality assessment
+  - Enhanced base strategy class with improved market analysis
 
-### Code Quality Improvements
-- **Type Safety**: Added `MonitoringConfig` and enhanced `RealTimeConfig`
-- **Error Handling**: Comprehensive exception handling in monitoring mode
-- **Resource Management**: Proper cleanup and connection management
-- **Performance**: Optimized buffer management and API calls
+### Architecture Enhancements
+- **Expanded Strategy Options**: Now 4 distinct strategies (up from 3)
+- **Enhanced Configuration**: Updated models with V2 strategy parameters
+- **Improved Buffer Management**: Default 200 historical candles for better context
+- **Type Safety**: Comprehensive Pydantic V2 validation
+- **Test Coverage**: 90%+ coverage with functionality-focused testing
+
+### Modular Architecture (Previous Implementation)
+- **Real-Time Module**: `src/cli/realtime.py` (785 lines)
+- **Display System**: `src/cli/displays.py` (271 lines)  
+- **Streamlined CLI**: `src/cli/main.py` with 8 operation modes
+- **Shared Utilities**: `src/utils/` with data helpers and type conversions
 
 ## Usage Patterns
 
@@ -191,10 +218,22 @@ make test-cov     # full test suite with coverage
 make run-dev      # development mode with debug logging
 ```
 
-### Real-Time Development
+### Strategy Development
+- Add new strategies to `src/analysis/strategies/`
+- Use `enhanced_base_strategy.py` as foundation for advanced features
+- Implement signal scoring in `src/analysis/scoring/signal_scorer.py`
+- Update `StrategyType` enum in `src/core/models.py`
+- Register strategy in CLI application (`src/cli/main.py`)
+
+### Real-Time Development  
 - Modify `src/cli/realtime.py` for streaming/monitoring logic
-- Update `src/core/models.py` for configuration changes  
+- Update `src/core/models.py` for configuration changes
 - Use `src/cli/displays.py` for UI component additions
+
+### Analysis Module Development
+- Add indicators to `src/analysis/indicators.py`
+- Enhance market analysis in `src/analysis/ema_analysis.py` or `market_context.py`
+- Use shared utilities from `src/utils/` for data handling and type safety
 
 The system is now **production-ready** with comprehensive real-time capabilities, modular architecture, and robust monitoring features for professional cryptocurrency trading analysis.
 

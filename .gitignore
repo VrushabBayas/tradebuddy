@@ -74,7 +74,6 @@ logs/
 # Application specific
 config/local.yaml
 config/production.yaml
-data/
 temp/
 tmp/
 

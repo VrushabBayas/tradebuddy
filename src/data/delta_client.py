@@ -503,33 +503,58 @@ class DeltaExchangeClient:
         jitter_microseconds = random.randint(0, 999)
         end_time = end_time.replace(microsecond=jitter_microseconds)
         
-        # Calculate start time based on timeframe and limit using timedelta
-        # Note: For live trading, we want recent data, not distant historical data
-        # Most technical analysis only needs 20-50 recent candles
+        # Calculate start time based on timeframe and requested limit
+        # Remove aggressive limits to support V2 strategy requiring 60+ periods
         if timeframe.endswith('m'):
             minutes = int(timeframe[:-1])
-            # For minute timeframes, limit to reasonable recent data
-            # Most intraday analysis doesn't need more than 8 hours of data
-            lookback_minutes = min(minutes * limit, 8 * 60)  # Max 8 hours
+            # For minute timeframes, allow full requested range
+            # V2 strategy needs sufficient data for 50 EMA + analysis buffer
+            lookback_minutes = minutes * limit
             start_time = end_time - timedelta(minutes=lookback_minutes)
         elif timeframe.endswith('h'):
             hours = int(timeframe[:-1])
-            # For hourly timeframes, limit to recent data for live trading
-            # Most swing analysis doesn't need more than 3 days of hourly data
-            lookback_hours = min(hours * limit, 3 * 24)  # Max 3 days (72 hours)
+            # For hourly timeframes, allow full requested range
+            # V2 strategy requires 60+ periods (200-300 hours for safety)
+            lookback_hours = hours * limit
             start_time = end_time - timedelta(hours=lookback_hours)
         elif timeframe == '1d':
-            # For daily timeframes, reasonable historical lookback
-            # Most position analysis doesn't need more than 6 months
-            lookback_days = min(limit, 180)  # Max 6 months
+            # For daily timeframes, allow full requested range
+            # Technical analysis may need several months of daily data
+            lookback_days = limit
             start_time = end_time - timedelta(days=lookback_days)
         else:
-            # Fallback: 24 hours ago
-            start_time = end_time - timedelta(hours=24)
+            # Fallback: use limit as hours
+            start_time = end_time - timedelta(hours=limit)
         
         # Preserve microsecond precision for uniqueness
         start_time = start_time.replace(second=0)  # Keep microseconds for uniqueness
         end_time = end_time.replace(second=0)  # Keep microseconds for uniqueness
+        
+        # Calculate expected number of periods for validation
+        if timeframe.endswith('m'):
+            minutes_per_period = int(timeframe[:-1])
+            total_minutes = (end_time - start_time).total_seconds() / 60
+            expected_periods = int(total_minutes / minutes_per_period)
+        elif timeframe.endswith('h'):
+            hours_per_period = int(timeframe[:-1])
+            total_hours = (end_time - start_time).total_seconds() / 3600
+            expected_periods = int(total_hours / hours_per_period)
+        elif timeframe == '1d':
+            total_days = (end_time - start_time).days
+            expected_periods = total_days
+        else:
+            expected_periods = limit
+
+        logger.info(
+            "Data fetching parameters",
+            symbol=symbol,
+            timeframe=timeframe,
+            requested_limit=limit,
+            time_range_start=start_time.isoformat(),
+            time_range_end=end_time.isoformat(),
+            expected_periods=expected_periods,
+            note="V2 strategy requires 60+ periods"
+        )
         
         logger.debug(
             "Generated unique time window",
@@ -616,7 +641,9 @@ class DeltaExchangeClient:
             "Market data assembled successfully",
             symbol=symbol,
             candles_count=len(candles),
+            requested_limit=limit,
             current_price=current_price,
+            sufficient_for_v2=len(candles) >= 60,
             data_freshness_validated=True
         )
         
