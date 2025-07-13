@@ -353,15 +353,42 @@ build: ## Build the package
 	@$(PYTHON) -m build
 	@echo "$(GREEN)✅ Package built$(NC)"
 
-# Docker commands (if needed in the future)
-docker-build: ## Build Docker image
-	@echo "$(YELLOW)🐳 Building Docker image...$(NC)"
+# Docker commands
+docker-build: ## Build TradeBuddy Docker image
+	@echo "$(YELLOW)🐳 Building TradeBuddy Docker image...$(NC)"
 	@docker build -t tradebuddy:latest .
 	@echo "$(GREEN)✅ Docker image built$(NC)"
 
-docker-run: ## Run Docker container
-	@echo "$(YELLOW)🐳 Running Docker container...$(NC)"
-	@docker run -it --rm tradebuddy:latest
+docker-up: ## Start TradeBuddy with Ollama (production)
+	@echo "$(YELLOW)🐳 Starting TradeBuddy services...$(NC)"
+	@docker-compose up -d ollama
+	@echo "$(BLUE)⏳ Waiting for Ollama to start...$(NC)"
+	@sleep 10
+	@docker-compose up tradebuddy
+	@echo "$(GREEN)✅ TradeBuddy started$(NC)"
+
+docker-dev: ## Start TradeBuddy in development mode
+	@echo "$(YELLOW)🐳 Starting TradeBuddy development environment...$(NC)"
+	@docker-compose --profile dev up
+
+docker-fingpt: ## Start TradeBuddy with FinGPT integration
+	@echo "$(YELLOW)🐳 Starting TradeBuddy with FinGPT...$(NC)"
+	@docker-compose --profile fingpt up
+
+docker-down: ## Stop all Docker services
+	@echo "$(YELLOW)🐳 Stopping TradeBuddy services...$(NC)"
+	@docker-compose down
+	@echo "$(GREEN)✅ Services stopped$(NC)"
+
+docker-logs: ## View TradeBuddy logs
+	@echo "$(YELLOW)📋 TradeBuddy logs:$(NC)"
+	@docker-compose logs -f tradebuddy
+
+docker-clean: ## Clean Docker images and volumes
+	@echo "$(YELLOW)🧹 Cleaning Docker resources...$(NC)"
+	@docker-compose down -v
+	@docker system prune -f
+	@echo "$(GREEN)✅ Docker cleanup completed$(NC)"
 
 # Development shortcuts
 dev: setup-env ## Complete development setup
