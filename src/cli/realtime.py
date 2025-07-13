@@ -92,9 +92,15 @@ class RealTimeAnalyzer:
             # Step 2: Reset state
             self._reset_session_state()
 
-            # Step 3: Load historical data
-            if not await self.load_historical_data():
-                return
+            # Step 3: Load historical data (continue even if fails)
+            historical_loaded = await self.load_historical_data()
+            if not historical_loaded:
+                # This shouldn't happen now since load_historical_data always returns True
+                # but keeping for safety
+                self.console.print(
+                    f"⚠️  Proceeding without historical data - live stream only", 
+                    style="yellow"
+                )
 
             # Step 4: Start real-time streaming
             await self.start_streaming()
@@ -199,7 +205,11 @@ class RealTimeAnalyzer:
             self.ohlcv_buffer = deque(maxlen=self.config.buffer_size)
 
     async def load_historical_data(self) -> bool:
-        """Load historical data to prime the analysis buffer."""
+        """Load historical data to prime the analysis buffer.
+        
+        Returns:
+            bool: True if successful, False if failed (but continues gracefully)
+        """
         if not self.config:
             return False
 
@@ -218,8 +228,8 @@ class RealTimeAnalyzer:
 
                 # Get recent historical data
                 historical_data = await self.delta_client.get_market_data(
-                    symbol=str(self.config.symbol),
-                    timeframe=str(self.config.timeframe),
+                    symbol=self.config.symbol.value,
+                    timeframe=self.config.timeframe.value,
                     limit=self.config.historical_candles,
                 )
 
@@ -239,8 +249,27 @@ class RealTimeAnalyzer:
             return True
 
         except Exception as e:
-            self.console.print(f"❌ Failed to load historical data: {e}", style="red")
-            return False
+            # Check if this is a stale data error (preserve data quality)
+            error_str = str(e).lower()
+            if "stale" in error_str or "too old" in error_str or "api_003" in error_str:
+                self.console.print(
+                    f"⚠️  Historical data is stale - skipping buffer priming", style="yellow"
+                )
+                self.console.print(
+                    f"   Reason: {e}", style="dim yellow"
+                )
+                self.console.print(
+                    f"🔄 Will start with empty buffer and collect fresh WebSocket data", style="cyan"
+                )
+                # Return True to continue with real-time streaming
+                return True
+            else:
+                # For other errors, still continue but warn user
+                self.console.print(f"❌ Failed to load historical data: {e}", style="red")
+                self.console.print(
+                    f"🔄 Continuing with live stream only - no historical context", style="yellow"
+                )
+                return True
 
     async def start_streaming(self) -> None:
         """Start real-time WebSocket streaming and analysis."""
@@ -261,8 +290,8 @@ class RealTimeAnalyzer:
 
             # Subscribe to candlestick data
             await self.websocket_client.subscribe_candlestick(
-                symbol=str(self.config.symbol),
-                timeframe=str(self.config.timeframe),
+                symbol=self.config.symbol.value,
+                timeframe=self.config.timeframe.value,
                 callback=lambda data: self.handle_candlestick(data, strategy_instance),
             )
 
@@ -312,6 +341,13 @@ class RealTimeAnalyzer:
         self.console.print(
             f"\n📊 LIVE CANDLESTICK #{self.analysis_count}", style="bold yellow"
         )
+        
+        
+        # Extract and display timestamp
+        timestamp_display = self._extract_candlestick_timestamp(data)
+        if timestamp_display:
+            self.console.print(f"   Time: {timestamp_display}")
+        
         self.console.print(f"   Close: ${data.get('close', 0):,.2f}")
         self.console.print(f"   Volume: {data.get('volume', 0)}")
 
@@ -330,9 +366,15 @@ class RealTimeAnalyzer:
             await self.run_strategy_analysis(strategy_instance)
         else:
             needed = 20 - len(self.ohlcv_buffer)
-            self.console.print(
-                f"⏳ Need {needed} more candles for analysis", style="yellow"
-            )
+            if len(self.ohlcv_buffer) == 1:
+                # First candle - likely starting with empty buffer due to stale historical data
+                self.console.print(
+                    f"🔄 Collecting fresh WebSocket data... ({needed} more needed)", style="cyan"
+                )
+            else:
+                self.console.print(
+                    f"⏳ Need {needed} more candles for analysis", style="yellow"
+                )
 
     async def run_strategy_analysis(self, strategy_instance):
         """Run strategy analysis on live data."""
@@ -372,6 +414,71 @@ class RealTimeAnalyzer:
 
         except Exception as e:
             self.console.print(f"❌ Live analysis failed: {e}", style="red")
+
+    def _extract_candlestick_timestamp(self, data) -> Optional[str]:
+        """
+        Extract and format timestamp from candlestick data.
+        
+        Args:
+            data: WebSocket candlestick data
+            
+        Returns:
+            Formatted IST timestamp string or None
+        """
+        from src.utils.helpers import format_ist_time_only
+        
+        try:
+            # Try to extract timestamp from WebSocket data first
+            timestamp_raw = data.get('timestamp')
+            if timestamp_raw:
+                # Convert to float if it's not already numeric
+                try:
+                    if isinstance(timestamp_raw, str):
+                        timestamp_value = float(timestamp_raw)
+                    else:
+                        timestamp_value = float(timestamp_raw)
+                except (ValueError, TypeError):
+                    timestamp_value = None
+                
+                if timestamp_value is not None:
+                    # Determine timestamp format based on magnitude
+                    # Delta Exchange uses microseconds (16 digits)
+                    
+                    if 1000000000 <= timestamp_value <= 9999999999:
+                        # Seconds (10 digits)
+                        divisor = 1
+                    elif 1000000000000 <= timestamp_value <= 9999999999999:
+                        # Milliseconds (13 digits)
+                        divisor = 1000
+                    elif 1000000000000000 <= timestamp_value <= 9999999999999999:
+                        # Microseconds (16 digits) - Delta Exchange format
+                        divisor = 1000000
+                    elif timestamp_value >= 1000000000000000000:
+                        # Nanoseconds (19+ digits)
+                        divisor = 1000000000
+                    else:
+                        # Unknown format - try as seconds
+                        divisor = 1
+                    
+                    try:
+                        timestamp_seconds = timestamp_value / divisor
+                        dt = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
+                        
+                        # Validate reasonable year range
+                        if 1970 <= dt.year <= 2100:
+                            return format_ist_time_only(dt)
+                    except (ValueError, OSError, OverflowError):
+                        pass
+            
+            # Fallback to current time if WebSocket data lacks timestamp or all conversions failed
+            current_time = datetime.now(timezone.utc)
+            return format_ist_time_only(current_time)
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract timestamp from candlestick data: {e}")
+            # Last resort fallback
+            current_time = datetime.now(timezone.utc) 
+            return format_ist_time_only(current_time)
 
     def display_analysis_results(self, result, current_price: float):
         """Display live analysis results in a compact format."""
@@ -668,8 +775,8 @@ class RealTimeAnalyzer:
 
                     # Load historical data
                     historical_data = await self.delta_client.get_market_data(
-                        symbol=str(symbol),
-                        timeframe=str(config.timeframe),
+                        symbol=symbol.value,
+                        timeframe=config.timeframe.value,
                         limit=config.historical_candles,
                     )
 
@@ -751,8 +858,8 @@ class RealTimeAnalyzer:
 
             # Get latest market data for this symbol
             latest_data = await self.delta_client.get_market_data(
-                symbol=str(symbol),
-                timeframe=str(config.timeframe),
+                symbol=symbol.value,
+                timeframe=config.timeframe.value,
                 limit=5,  # Just get latest candles
             )
 
@@ -989,8 +1096,8 @@ class RealTimeAnalyzer:
 
             # Get fresh historical data
             fresh_data = await self.delta_client.get_market_data(
-                symbol=str(symbol),
-                timeframe=str(config.timeframe),
+                symbol=symbol.value,
+                timeframe=config.timeframe.value,
                 limit=config.historical_candles,
             )
 
@@ -1001,7 +1108,7 @@ class RealTimeAnalyzer:
 
             logger.info(
                 "Buffer refreshed with fresh data",
-                symbol=str(symbol),
+                symbol=symbol.value,
                 candles_loaded=len(fresh_data.ohlcv_data),
                 latest_timestamp=fresh_data.latest_ohlcv.timestamp.isoformat() if fresh_data.latest_ohlcv else "Unknown"
                 if fresh_data.ohlcv_data
