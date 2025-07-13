@@ -109,3 +109,5 @@ make docker-clean
 - Missing `.env` file: Copy from `.env.docker` template
 - Invalid API keys: Use empty values for development
 - Permission errors: Check file ownership and Docker permissions
+- **Port 11434 already in use**: Docker uses port 11435 to avoid conflicts with local Ollama
+- Service startup fails: Check `docker-compose logs <service-name>` for detailed errors
