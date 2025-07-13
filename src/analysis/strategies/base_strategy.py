@@ -12,7 +12,8 @@ from typing import Any, Dict
 import structlog
 
 from src.analysis.indicators import TechnicalIndicators
-from src.analysis.ollama_client import OllamaClient
+from src.analysis.ai_models.ai_interface import AIModelInterface
+from src.analysis.ai_models.model_factory import ModelFactory
 from src.core.exceptions import DataValidationError, StrategyError
 from src.core.models import AnalysisResult, MarketData, SessionConfig, StrategyType
 
@@ -31,13 +32,30 @@ class BaseStrategy(ABC):
     - Performance monitoring
     """
 
-    def __init__(self):
-        """Initialize base strategy with required components."""
+    def __init__(self, ai_model: AIModelInterface = None):
+        """
+        Initialize base strategy with required components.
+        
+        Args:
+            ai_model: AI model instance (optional, will create default if not provided)
+        """
         self.indicators = TechnicalIndicators()
-        self.ollama_client = OllamaClient()
+        
+        # Use provided AI model or create default (Ollama)
+        if ai_model is not None:
+            self.ai_model = ai_model
+        else:
+            # Default to Ollama for backward compatibility
+            from src.core.models import AIModelType
+            self.ai_model = ModelFactory.create_model(AIModelType.OLLAMA)
+            
         self.strategy_type = StrategyType.COMBINED  # Default, override in subclasses
 
-        logger.debug("Strategy initialized", strategy_type=self.strategy_type.value)
+        logger.debug(
+            "Strategy initialized", 
+            strategy_type=self.strategy_type.value,
+            ai_model=self.ai_model.model_name
+        )
 
     @abstractmethod
     async def analyze(
@@ -272,8 +290,8 @@ class BaseStrategy(ABC):
         start_time = time.time()
 
         try:
-            # Use Ollama client for AI analysis
-            analysis_result = await self.ollama_client.analyze_market(
+            # Use AI model for analysis
+            analysis_result = await self.ai_model.analyze_market(
                 market_data=market_data,
                 technical_analysis=technical_analysis,
                 strategy=self.strategy_type,
@@ -345,7 +363,7 @@ class BaseStrategy(ABC):
     async def close(self) -> None:
         """Close strategy resources."""
         try:
-            await self.ollama_client.close()
+            await self.ai_model.close()
             logger.debug("Strategy resources closed", strategy=self.strategy_type.value)
         except Exception as e:
             logger.error("Error closing strategy resources", error=str(e))

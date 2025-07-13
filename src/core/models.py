@@ -42,6 +42,13 @@ class StrategyType(str, Enum):
     COMBINED = "combined"
 
 
+class AIModelType(str, Enum):
+    """Available AI model types."""
+
+    OLLAMA = "ollama"
+    FINGPT = "fingpt"
+
+
 class SignalAction(str, Enum):
     """Trading signal actions."""
 
@@ -391,6 +398,25 @@ class EMAStrategyConfig(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class AIModelConfig(BaseModel):
+    """Configuration for AI model selection and behavior."""
+
+    model_type: AIModelType = Field(
+        default=AIModelType.OLLAMA, description="AI model type to use"
+    )
+    fingpt_model_variant: str = Field(
+        default="v3.2", description="FinGPT model variant (v3.1, v3.2, v3.3)"
+    )
+    fallback_enabled: bool = Field(
+        default=True, description="Enable fallback to Ollama if primary model fails"
+    )
+    comparative_mode: bool = Field(
+        default=False, description="Run both models and compare results"
+    )
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
 class SessionConfig(BaseModel):
     """Configuration for an analysis session."""
 
@@ -448,6 +474,11 @@ class SessionConfig(BaseModel):
     # Strategy-specific configurations
     ema_config: "Optional[EMAStrategyConfig]" = Field(
         default=None, description="EMA strategy configuration"
+    )
+    
+    # AI model configuration
+    ai_model_config: AIModelConfig = Field(
+        default_factory=AIModelConfig, description="AI model configuration"
     )
 
     model_config = ConfigDict(use_enum_values=True)

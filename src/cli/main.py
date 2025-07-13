@@ -25,6 +25,7 @@ from src.analysis.strategies.combined import CombinedStrategy
 from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
 from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
+from src.analysis.ai_models.model_factory import ModelFactory
 from src.backtesting.engine import BacktestEngine
 from src.backtesting.models import BacktestConfig
 from src.backtesting.reports import BacktestReportGenerator
@@ -32,7 +33,7 @@ from src.cli.displays import CLIDisplays
 from src.cli.realtime import RealTimeAnalyzer
 from src.core.config import settings
 from src.core.exceptions import CLIError
-from src.core.models import SessionConfig, StrategyType, Symbol, TimeFrame
+from src.core.models import SessionConfig, StrategyType, Symbol, TimeFrame, AIModelType, AIModelConfig
 from src.data.delta_client import DeltaExchangeClient
 from src.data.websocket_client import DeltaWebSocketClient
 
@@ -48,12 +49,8 @@ class CLIApplication:
         self.running = True
         self.delta_client = DeltaExchangeClient()
         self.websocket_client = DeltaWebSocketClient()
-        self.strategies = {
-            StrategyType.SUPPORT_RESISTANCE: SupportResistanceStrategy(),
-            StrategyType.EMA_CROSSOVER: EMACrossoverStrategy(),
-            StrategyType.EMA_CROSSOVER_V2: EMACrossoverV2Strategy(),
-            StrategyType.COMBINED: CombinedStrategy(),
-        }
+        # Strategies will be created dynamically with AI model configuration
+        self.strategies = {}
 
         # Display utilities
         self.displays = CLIDisplays(self.console)
@@ -168,6 +165,9 @@ class CLIApplication:
 
         # Risk parameters
         risk_params = await self.configure_risk_parameters()
+        
+        # AI model selection
+        ai_model_config = await self.select_ai_model()
 
         config = SessionConfig(
             strategy=strategy,
@@ -179,6 +179,7 @@ class CLIApplication:
             stop_loss_pct=Decimal("1.5"),  # Placeholder - will be calculated dynamically based on risk
             take_profit_pct=Decimal(str(risk_params["take_profit"])),
             leverage=risk_params["leverage"],
+            ai_model_config=ai_model_config,
         )
 
         # Display configuration summary
@@ -236,6 +237,92 @@ class CLIApplication:
         self.console.print(f"✅ Selected: {selected_timeframe.value}", style="green")
 
         return selected_timeframe
+
+    async def select_ai_model(self) -> AIModelConfig:
+        """Select AI model for analysis."""
+        self.console.print("\n🤖 AI Model Selection", style="bold")
+        
+        # Create AI model selection table
+        table = Table(title="Available AI Models", show_header=True, header_style="bold cyan")
+        table.add_column("Option", style="cyan", justify="center")
+        table.add_column("Model", style="white")
+        table.add_column("Description", style="dim")
+        table.add_column("Features", style="green")
+        
+        table.add_row(
+            "1", 
+            "Ollama (Qwen2.5:14b)", 
+            "Local LLM - Current default", 
+            "General AI, Fast, Private"
+        )
+        table.add_row(
+            "2", 
+            "FinGPT v3.2", 
+            "Financial-specialized AI", 
+            "Financial expertise, Sentiment analysis"
+        )
+        table.add_row(
+            "3", 
+            "FinGPT v3.3", 
+            "Latest FinGPT model", 
+            "Enhanced financial analysis, Latest features"
+        )
+        
+        self.console.print(table)
+        
+        choice = Prompt.ask(
+            "\nSelect AI model", choices=["1", "2", "3"], default="1"
+        )
+        
+        if choice == "1":
+            ai_config = AIModelConfig(
+                model_type=AIModelType.OLLAMA,
+                fallback_enabled=True
+            )
+            self.console.print("✅ Selected: Ollama (Qwen2.5:14b)", style="green")
+        elif choice == "2":
+            ai_config = AIModelConfig(
+                model_type=AIModelType.FINGPT,
+                fingpt_model_variant="v3.2",
+                fallback_enabled=True
+            )
+            self.console.print("✅ Selected: FinGPT v3.2", style="green")
+        else:  # choice == "3"
+            ai_config = AIModelConfig(
+                model_type=AIModelType.FINGPT,
+                fingpt_model_variant="v3.3",
+                fallback_enabled=True
+            )
+            self.console.print("✅ Selected: FinGPT v3.3", style="green")
+        
+        # Ask about comparative mode
+        if ai_config.model_type == AIModelType.FINGPT:
+            comparative = Confirm.ask(
+                "\n🔍 Enable comparative mode? (Run both Ollama and FinGPT for comparison)",
+                default=False
+            )
+            ai_config.comparative_mode = comparative
+            if comparative:
+                self.console.print("✅ Comparative mode enabled", style="green")
+        
+        return ai_config
+
+    def create_strategy_with_ai_model(self, strategy_type: StrategyType, ai_config: AIModelConfig):
+        """Create strategy instance with specified AI model configuration."""
+        # Create AI model based on configuration
+        ai_model = ModelFactory.create_model(ai_config.model_type, config=ai_config)
+        
+        # Create strategy with AI model
+        if strategy_type == StrategyType.SUPPORT_RESISTANCE:
+            return SupportResistanceStrategy(ai_model=ai_model)
+        elif strategy_type == StrategyType.EMA_CROSSOVER:
+            return EMACrossoverStrategy(ai_model=ai_model)
+        elif strategy_type == StrategyType.EMA_CROSSOVER_V2:
+            return EMACrossoverV2Strategy(ai_model=ai_model)
+        elif strategy_type == StrategyType.COMBINED:
+            return CombinedStrategy(ai_model=ai_model)
+        else:
+            raise ValueError(f"Unknown strategy type: {strategy_type}")
 
     async def configure_risk_parameters(self) -> dict:
         """Configure risk-based capital management parameters."""
@@ -335,8 +422,8 @@ class CLIApplication:
         self.console.print(f"\n🚀 Starting Analysis Session", style="bold green")
 
         try:
-            # Get strategy instance
-            strategy_instance = self.strategies[strategy]
+            # Create strategy instance with AI model configuration
+            strategy_instance = self.create_strategy_with_ai_model(strategy, config.ai_model_config)
 
             # Step 1: Fetch market data
             with Progress(
