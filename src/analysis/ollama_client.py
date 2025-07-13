@@ -220,6 +220,85 @@ class OllamaClient:
                 error_code=ErrorCodes.API_CONNECTION_FAILED,
             )
 
+    async def _make_get_request(self, endpoint: str) -> Dict[str, Any]:
+        """
+        Make HTTP GET request to Ollama API.
+
+        Args:
+            endpoint: API endpoint
+
+        Returns:
+            Response data
+
+        Raises:
+            APIConnectionError: Connection or HTTP errors
+            APITimeoutError: Request timeout
+            OllamaAPIError: Ollama-specific errors
+        """
+        await self._ensure_session()
+
+        # Rate limiting - ensure minimum time between requests
+        current_time = time.time()
+        time_since_last = current_time - self._last_request_time
+        min_interval = 1.0 / OllamaConstants.MAX_RETRIES
+
+        if time_since_last < min_interval:
+            await asyncio.sleep(min_interval - time_since_last)
+
+        self._last_request_time = time.time()
+
+        url = f"{self.base_url}{endpoint}"
+        request_id = str(uuid.uuid4())[:8]
+
+        try:
+            logger.debug(
+                "Making Ollama GET request",
+                url=url,
+                request_id=request_id,
+            )
+
+            start_time = time.time()
+
+            async with self._session.get(url) as response:
+                request_time = time.time() - start_time
+
+                if response.status >= 400:
+                    error_text = await response.text()
+                    logger.error(
+                        "Ollama GET request failed",
+                        status=response.status,
+                        error=error_text,
+                        request_time=request_time,
+                    )
+
+                    raise APIConnectionError(
+                        f"Ollama GET request failed with status {response.status}: {error_text}",
+                        error_code=ErrorCodes.API_CONNECTION_FAILED,
+                    )
+
+                result = await response.json()
+
+                logger.debug(
+                    "Ollama GET request successful",
+                    status=response.status,
+                    request_time=request_time,
+                )
+
+                return result
+
+        except asyncio.TimeoutError:
+            logger.error("Ollama GET request timeout", url=url, timeout=self.timeout)
+            raise APITimeoutError(
+                f"Ollama GET request timeout after {self.timeout} seconds",
+                error_code=ErrorCodes.API_TIMEOUT,
+            )
+        except aiohttp.ClientError as e:
+            logger.error("Ollama GET HTTP client error", error=str(e), url=url)
+            raise APIConnectionError(
+                f"Ollama GET HTTP client error: {str(e)}",
+                error_code=ErrorCodes.API_CONNECTION_FAILED,
+            )
+
     def _validate_market_data(self, market_data: MarketData) -> None:
         """Validate market data for analysis."""
         if market_data is None:
@@ -504,12 +583,12 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
         signals = []
 
         try:
-            # Extract signal components using regex
-            signal_pattern = r"TRADING SIGNAL:\s*(BUY|SELL|NEUTRAL|WAIT)"
-            confidence_pattern = r"CONFIDENCE:\s*(\d+)(?:/10)?"
-            entry_pattern = r"ENTRY PRICE:\s*\$?([0-9,]+\.?\d*)"
-            stop_loss_pattern = r"STOP LOSS:\s*\$?([0-9,]+\.?\d*)"
-            take_profit_pattern = r"TAKE PROFIT:\s*\$?([0-9,]+\.?\d*)"
+            # Extract signal components using regex (handle both plain and markdown formatting)
+            signal_pattern = r"(?:\*\*)?TRADING SIGNAL:(?:\*\*)?\s*(BUY|SELL|NEUTRAL|WAIT)"
+            confidence_pattern = r"(?:\*\*)?CONFIDENCE:(?:\*\*)?\s*(\d+)(?:/10)?"
+            entry_pattern = r"(?:\*\*)?ENTRY PRICE:(?:\*\*)?\s*\$?([0-9,]+\.?\d*)"
+            stop_loss_pattern = r"(?:\*\*)?STOP LOSS:(?:\*\*)?\s*\$?([0-9,]+\.?\d*)"
+            take_profit_pattern = r"(?:\*\*)?TAKE PROFIT:(?:\*\*)?\s*\$?([0-9,]+\.?\d*)"
 
             # Find all matches
             signal_matches = re.findall(signal_pattern, ai_response, re.IGNORECASE)
@@ -848,7 +927,8 @@ Only provide BUY/SELL signals when both strategies align. Use NEUTRAL when strat
         try:
             logger.debug("Checking Ollama model health", model=self.model)
 
-            response = await self._make_request("/api/tags", {})
+            # Use GET request for /api/tags endpoint
+            response = await self._make_get_request("/api/tags")
             models = response.get("models", [])
 
             # Check if our model is in the list

@@ -291,8 +291,22 @@ class DeltaExchangeClient:
         age_minutes = time_diff.total_seconds() / 60
         
         if age_minutes > max_age_minutes:
-            # Check if data is extremely stale (more than 6 hours)
-            if age_minutes > 360:  # 6 hours
+            from src.core.config import settings
+            
+            # In development mode, be more lenient with stale data for testing
+            if settings.is_development:
+                logger.warning(
+                    "Stale market data detected - allowing in development mode",
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    latest_candle_time=latest_candle.timestamp.isoformat(),
+                    age_minutes=age_minutes,
+                    max_age_minutes=max_age_minutes,
+                    development_mode=True,
+                    note="Data validation relaxed for development/testing"
+                )
+                # Continue with stale data in development mode - skip the error
+            elif age_minutes > 360:  # 6 hours for production
                 logger.warning(
                     "Very stale market data detected - markets may be closed",
                     symbol=symbol,

@@ -36,6 +36,7 @@ from src.core.exceptions import CLIError
 from src.core.models import SessionConfig, StrategyType, Symbol, TimeFrame, AIModelType, AIModelConfig
 from src.data.delta_client import DeltaExchangeClient
 from src.data.websocket_client import DeltaWebSocketClient
+from src.utils.logging_utils import analysis_progress, setup_cli_logging
 
 console = Console()
 logger = structlog.get_logger(__name__)
@@ -62,6 +63,9 @@ class CLIApplication:
             websocket_client=self.websocket_client,
             strategies=self.strategies,
         )
+
+        # Setup optimized logging for CLI
+        setup_cli_logging()
 
     async def run(self):
         """Run the main CLI application loop."""
@@ -437,23 +441,14 @@ class CLIApplication:
 
         try:
             # Step 1: Fetch market data
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=self.console,
-            ) as progress:
-                task = progress.add_task(
-                    "Fetching market data from Delta Exchange...", total=None
-                )
-
+            with analysis_progress(self.console, "📊 Fetching market data from Delta Exchange...") as (progress, task):
                 market_data = await self.delta_client.get_market_data(
                     symbol=config.symbol,
                     timeframe=config.timeframe,
                     limit=200,
                 )
-
                 progress.update(task, description="✅ Market data fetched successfully")
-                await asyncio.sleep(0.5)  # Brief pause for user experience
+                await asyncio.sleep(0.3)  # Brief pause for user experience
 
             # Display market data summary
             self.displays.display_market_data_summary(market_data)
@@ -483,40 +478,31 @@ class CLIApplication:
         strategy_instance = self.create_strategy_with_ai_model(strategy, config.ai_model_config)
 
         # Step 2: Run strategy analysis
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=self.console,
-        ) as progress:
-            task = progress.add_task("Running technical analysis...", total=None)
-
+        # Get AI model name for display
+        if config.ai_model_config:
+            model_type = config.ai_model_config.model_type
+            # Handle both enum and string values
+            if hasattr(model_type, 'value'):
+                ai_model_name = model_type.value.title()
+            else:
+                ai_model_name = str(model_type).title()
+        else:
+            ai_model_name = "Ollama"
+        
+        with analysis_progress(self.console, f"🧠 Running {ai_model_name} analysis...") as (progress, task):
             # Run the strategy analysis
             analysis_result = await strategy_instance.analyze(market_data, config)
-
-            # Get AI model name for display
-            if config.ai_model_config:
-                model_type = config.ai_model_config.model_type
-                # Handle both enum and string values
-                if hasattr(model_type, 'value'):
-                    ai_model_name = model_type.value.title()
-                else:
-                    ai_model_name = str(model_type).title()
-            else:
-                ai_model_name = "Ollama"
-            
-            progress.update(
-                task, description=f"🧠 Generating AI analysis with {ai_model_name}..."
-            )
-            await asyncio.sleep(1)  # AI processing time
-
             progress.update(task, description="✅ Analysis completed successfully")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
         # Display analysis results
         self.displays.display_analysis_results(analysis_result, ai_model_name)
 
         # Display trading signals
         self.displays.display_trading_signals(analysis_result, config)
+        
+        # Cleanup strategy instance
+        await strategy_instance.close()
 
     async def _run_comparative_analysis(self, strategy: StrategyType, config: SessionConfig, market_data):
         """Run comparative analysis with multiple AI models."""
@@ -528,18 +514,12 @@ class CLIApplication:
         # Create strategy instance for technical analysis
         strategy_instance = self.create_strategy_with_ai_model(strategy, config.ai_model_config)
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=self.console,
-        ) as progress:
-            task = progress.add_task("Running technical analysis...", total=None)
-
+        with analysis_progress(self.console, "🧠 Running comparative AI analysis...") as (progress, task):
             # Get technical analysis from strategy (without AI analysis)
             # We'll extract technical indicators from the strategy
             technical_analysis = await strategy_instance._calculate_technical_analysis(market_data)
             
-            progress.update(task, description="🧠 Running comparative AI analysis...")
+            progress.update(task, description="🤖 Analyzing with multiple AI models...")
             
             # Run comparative analysis
             comparison_results = await comparative_analyzer.analyze_with_comparison(
@@ -550,13 +530,14 @@ class CLIApplication:
             )
             
             progress.update(task, description="✅ Comparative analysis completed")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
         # Display comparative results
         await self._display_comparative_results(comparison_results, config)
         
         # Cleanup
         await comparative_analyzer.close()
+        await strategy_instance.close()
 
     async def _display_comparative_results(self, comparison_results: dict, config: SessionConfig):
         """Display comparative analysis results."""
@@ -768,18 +749,12 @@ class CLIApplication:
         self.console.print(config_table)
 
         # Progress indicator
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=self.console,
-        ) as progress:
-            task = progress.add_task("Running backtest...", total=None)
-            
+        with analysis_progress(self.console, "📊 Running backtest analysis...") as (progress, task):
             # Create and run backtesting engine
             engine = BacktestEngine(config)
             result = await engine.run_backtest()
             
-            progress.update(task, description="Generating HTML report...")
+            progress.update(task, description="📋 Generating HTML report...")
             
             # Generate report (INR currency)
             report_generator = BacktestReportGenerator(currency="INR")
@@ -828,13 +803,42 @@ class CLIApplication:
 
     async def cleanup(self):
         """Cleanup resources."""
+        logger.debug("Starting CLI cleanup")
+        
+        # Close delta client
         try:
             await self.delta_client.close()
-            await self.websocket_client.disconnect()
-            for strategy in self.strategies.values():
-                await strategy.close()
+            logger.debug("Delta client closed")
         except Exception as e:
-            logger.error("Error during cleanup", error=str(e))
+            logger.error("Error closing delta client", error=str(e))
+        
+        # Disconnect websocket client
+        try:
+            await self.websocket_client.disconnect()
+            logger.debug("WebSocket client disconnected")
+        except Exception as e:
+            logger.error("Error disconnecting websocket client", error=str(e))
+        
+        # Close any cached strategies
+        try:
+            for strategy_name, strategy in self.strategies.items():
+                await strategy.close()
+                logger.debug("Strategy closed", strategy=strategy_name)
+        except Exception as e:
+            logger.error("Error closing strategies", error=str(e))
+        
+        # Close real-time analyzer
+        try:
+            if hasattr(self.realtime_analyzer, 'close'):
+                await self.realtime_analyzer.close()
+                logger.debug("Real-time analyzer closed")
+        except Exception as e:
+            logger.error("Error closing real-time analyzer", error=str(e))
+        
+        # Give a moment for connections to fully close
+        await asyncio.sleep(0.1)
+        
+        logger.debug("CLI cleanup completed")
 
 
 # Create CLI application instance
@@ -845,8 +849,19 @@ async def main():
     """Main CLI function."""
     try:
         await cli_app.run()
+    except KeyboardInterrupt:
+        logger.info("Application interrupted by user")
+    except Exception as e:
+        logger.error("Application error", error=str(e))
+        if settings.is_development:
+            import traceback
+            traceback.print_exc()
     finally:
-        await cli_app.cleanup()
+        # Ensure cleanup always runs
+        try:
+            await cli_app.cleanup()
+        except Exception as e:
+            logger.error("Cleanup error", error=str(e))
 
 
 # Click command for script execution
@@ -856,7 +871,8 @@ import click
 @click.command()
 @click.option("--env", default="development", help="Environment to run in")
 @click.option("--debug", is_flag=True, help="Enable debug mode")
-def cli(env, debug):
+@click.option("--verbose", is_flag=True, help="Enable verbose logging (shows all debug logs)")
+def cli(env, debug, verbose):
     """TradeBuddy CLI application."""
     # Set environment
     import os
@@ -864,6 +880,12 @@ def cli(env, debug):
     os.environ["PYTHON_ENV"] = env
     if debug:
         os.environ["DEBUG"] = "true"
+    if verbose:
+        os.environ["LOG_LEVEL"] = "DEBUG"
+        print("🔧 Verbose logging enabled - you'll see detailed debug information")
+    else:
+        # Ensure clean UI by default
+        os.environ["LOG_LEVEL"] = "INFO"
 
     # Run the main application
     asyncio.run(main())

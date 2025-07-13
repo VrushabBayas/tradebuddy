@@ -141,26 +141,64 @@ class ComparativeAnalyzer:
         model_key = model_type.value
         
         try:
-            logger.debug("Starting analysis", model=model_key)
+            logger.debug("Starting analysis", model=model_key, strategy=strategy_type)
             start_time = time.time()
             
             model = self.models[model_key]
+            
+            # Convert strategy_type string to StrategyType enum if needed
+            if isinstance(strategy_type, str):
+                from src.core.models import StrategyType
+                try:
+                    strategy_enum = StrategyType(strategy_type.lower())
+                except ValueError:
+                    logger.error(f"Invalid strategy type: {strategy_type}")
+                    raise ValueError(f"Invalid strategy type: {strategy_type}")
+            else:
+                strategy_enum = strategy_type
+            
+            logger.debug(f"Calling analyze_market for {model_key}", strategy_enum=strategy_enum.value)
+            
             result = await model.analyze_market(
-                market_data, technical_analysis, strategy_type, session_config
+                market_data, technical_analysis, strategy_enum, session_config
             )
             
+            # Validate the result is properly formed
+            if result is None:
+                raise ValueError(f"AI model {model_key} returned None result")
+            
+            if not hasattr(result, 'signals'):
+                logger.error(
+                    f"Invalid result from {model_key}",
+                    result_type=type(result).__name__,
+                    result_dir=dir(result) if hasattr(result, '__dict__') else "No __dict__",
+                    result_str=str(result)[:200]
+                )
+                raise AttributeError(f"AI model {model_key} returned invalid result without 'signals' attribute. Result type: {type(result)}")
+            
+            if not isinstance(result.signals, list):
+                raise TypeError(f"AI model {model_key} signals attribute is not a list. Type: {type(result.signals)}")
+            
             execution_time = time.time() - start_time
-            logger.debug(
-                "Analysis completed", 
+            logger.info(
+                "Analysis completed successfully", 
                 model=model_key, 
                 execution_time=execution_time,
-                signals_count=len(result.signals)
+                signals_count=len(result.signals),
+                result_type=type(result).__name__,
+                has_ai_analysis=hasattr(result, 'ai_analysis') and bool(result.ai_analysis)
             )
             
             return (model_type, result)
             
         except Exception as e:
-            logger.error("Analysis failed", model=model_key, error=str(e))
+            logger.error(
+                "Analysis failed", 
+                model=model_key, 
+                error=str(e), 
+                error_type=type(e).__name__,
+                strategy=strategy_type
+            )
             return (model_type, e)
 
     def _process_comparative_results(
@@ -173,51 +211,140 @@ class ComparativeAnalyzer:
         """Process and structure comparative analysis results."""
         comparison_results = {}
         
-        for model_type, result in zip(model_types, results):
+        logger.info(f"Processing {len(results)} comparative analysis results")
+        
+        for i, (model_type, result) in enumerate(zip(model_types, results)):
             model_key = model_type.value
             
+            logger.debug(
+                f"Processing result {i+1}/{len(results)} for {model_key}", 
+                result_type=type(result).__name__,
+                is_exception=isinstance(result, Exception),
+                is_tuple=isinstance(result, tuple)
+            )
+            
+            # Handle exceptions from asyncio.gather (should not happen with return_exceptions=True)
             if isinstance(result, Exception):
-                comparison_results[model_key] = {
-                    "status": "failed",
-                    "error": str(result),
-                    "signals": [],
-                    "analysis": f"Analysis failed: {str(result)}",
-                    "execution_time": None
-                }
-            else:
-                try:
-                    # Ensure result is a tuple with (model_type, AnalysisResult)
-                    if isinstance(result, tuple) and len(result) == 2:
-                        analysis_result = result[1]
-                    else:
-                        # If not a tuple, assume it's the AnalysisResult directly
-                        analysis_result = result
-                    
-                    # Verify the analysis_result has required attributes
-                    if not hasattr(analysis_result, 'signals'):
-                        raise AttributeError(f"Analysis result missing 'signals' attribute. Type: {type(analysis_result)}")
-                    
-                    comparison_results[model_key] = {
-                        "status": "success",
-                        "error": None,
-                        "signals": analysis_result.signals,
-                        "analysis": getattr(analysis_result, 'ai_analysis', 'No analysis available'),
-                        "primary_signal": getattr(analysis_result, 'primary_signal', None),
-                        "execution_time": getattr(analysis_result, 'execution_time', None),
-                        "signal_count": len(analysis_result.signals),
-                        "avg_confidence": self._calculate_average_confidence(analysis_result.signals)
-                    }
-                except Exception as e:
-                    logger.error(f"Error processing result for {model_key}: {str(e)}")
-                    comparison_results[model_key] = {
-                        "status": "failed",
-                        "error": f"Result processing error: {str(e)}",
-                        "signals": [],
-                        "analysis": f"Failed to process analysis result: {str(e)}",
-                        "execution_time": None
-                    }
+                logger.error(f"Direct exception result for {model_key}: {str(result)}")
+                comparison_results[model_key] = self._create_failed_result(
+                    f"Direct exception: {str(result)}"
+                )
+                continue
+            
+            # Result should be a tuple (model_type, result_or_exception) from _run_single_analysis
+            try:
+                if not isinstance(result, tuple) or len(result) != 2:
+                    logger.error(
+                        f"Invalid result format for {model_key}",
+                        result_type=type(result).__name__,
+                        result_len=len(result) if hasattr(result, '__len__') else "N/A"
+                    )
+                    comparison_results[model_key] = self._create_failed_result(
+                        f"Invalid result format. Expected tuple(model_type, result), got {type(result)}"
+                    )
+                    continue
+                
+                returned_model_type, analysis_result = result
+                
+                # Verify model type matches
+                if returned_model_type != model_type:
+                    logger.warning(
+                        f"Model type mismatch for {model_key}",
+                        expected=model_type.value,
+                        returned=returned_model_type.value if hasattr(returned_model_type, 'value') else str(returned_model_type)
+                    )
+                
+                # Check if the analysis result is an exception
+                if isinstance(analysis_result, Exception):
+                    logger.error(f"Model {model_key} returned exception: {str(analysis_result)}")
+                    comparison_results[model_key] = self._create_failed_result(
+                        f"Model analysis failed: {str(analysis_result)}"
+                    )
+                    continue
+                
+                # Validate it's a proper AnalysisResult
+                if analysis_result is None:
+                    logger.error(f"Model {model_key} returned None")
+                    comparison_results[model_key] = self._create_failed_result("Model returned None result")
+                    continue
+                
+                if not hasattr(analysis_result, 'signals'):
+                    logger.error(
+                        f"Invalid AnalysisResult from {model_key}",
+                        result_type=type(analysis_result).__name__,
+                        available_attrs=list(dir(analysis_result)) if hasattr(analysis_result, '__dict__') else "No attributes",
+                        result_str=str(analysis_result)[:200]
+                    )
+                    comparison_results[model_key] = self._create_failed_result(
+                        f"Invalid AnalysisResult: missing 'signals' attribute. Type: {type(analysis_result)}"
+                    )
+                    continue
+                
+                if not isinstance(analysis_result.signals, list):
+                    logger.error(f"Invalid signals type for {model_key}", signals_type=type(analysis_result.signals).__name__)
+                    comparison_results[model_key] = self._create_failed_result(
+                        f"Signals is not a list. Type: {type(analysis_result.signals)}"
+                    )
+                    continue
+                
+                # Successfully validated - create success result
+                comparison_results[model_key] = self._create_success_result(analysis_result, model_key)
+                
+                logger.info(
+                    f"Successfully processed {model_key}",
+                    signals_count=len(analysis_result.signals),
+                    has_primary_signal=len(analysis_result.signals) > 0,
+                    execution_time=getattr(analysis_result, 'execution_time', None)
+                )
+                
+            except Exception as e:
+                logger.error(
+                    f"Exception while processing {model_key}",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    result_type=type(result).__name__
+                )
+                comparison_results[model_key] = self._create_failed_result(
+                    f"Processing exception: {str(e)}"
+                )
+
+        logger.info(
+            f"Comparative results processing completed",
+            total_models=len(model_types),
+            successful_models=len([r for r in comparison_results.values() if r["status"] == "success"]),
+            failed_models=len([r for r in comparison_results.values() if r["status"] == "failed"])
+        )
 
         return comparison_results
+    
+    def _create_failed_result(self, error_message: str) -> Dict[str, Any]:
+        """Create a standardized failed result."""
+        return {
+            "status": "failed",
+            "error": error_message,
+            "signals": [],
+            "analysis": f"Analysis failed: {error_message}",
+            "execution_time": None,
+            "signal_count": 0,
+            "avg_confidence": 0.0,
+            "primary_signal": None
+        }
+    
+    def _create_success_result(self, analysis_result, model_key: str) -> Dict[str, Any]:
+        """Create a standardized success result."""
+        # Get primary signal - should be the first signal if any exist
+        primary_signal = analysis_result.signals[0] if analysis_result.signals else None
+        
+        return {
+            "status": "success",
+            "error": None,
+            "signals": analysis_result.signals,
+            "analysis": getattr(analysis_result, 'ai_analysis', 'No analysis available'),
+            "primary_signal": primary_signal,
+            "execution_time": getattr(analysis_result, 'execution_time', None),
+            "signal_count": len(analysis_result.signals),
+            "avg_confidence": self._calculate_average_confidence(analysis_result.signals)
+        }
 
     def _calculate_average_confidence(self, signals: List[TradingSignal]) -> float:
         """Calculate average confidence across signals."""
