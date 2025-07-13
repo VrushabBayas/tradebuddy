@@ -44,8 +44,13 @@ class ModelFactory:
             ValueError: If model type is not supported
             ImportError: If required dependencies are not installed
         """
-        # Validate model_type is correct enum type (Fail Fast)
-        if not isinstance(model_type, AIModelType):
+        # Convert string to enum if needed (handle serialized enum values)
+        if isinstance(model_type, str):
+            try:
+                model_type = AIModelType(model_type)
+            except ValueError:
+                raise ValueError(f"Invalid model type: {model_type}. Must be a valid AIModelType value.")
+        elif not isinstance(model_type, AIModelType):
             raise ValueError(f"Invalid model type: {model_type}. Must be an AIModelType enum.")
 
         logger.debug("Creating AI model", model_type=model_type.value)
