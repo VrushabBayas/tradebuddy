@@ -346,8 +346,8 @@ class CLIApplication:
                 )
 
                 market_data = await self.delta_client.get_market_data(
-                    symbol=str(config.symbol),
-                    timeframe=str(config.timeframe),
+                    symbol=config.symbol,
+                    timeframe=config.timeframe,
                     limit=100,
                 )
 

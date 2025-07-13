@@ -5,7 +5,7 @@ Defines comprehensive data structures for backtesting configuration,
 trades, results, and performance metrics.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -96,12 +96,12 @@ class BacktestConfig(BaseModel):
     @property
     def start_date(self) -> datetime:
         """Calculate backtest start date."""
-        return datetime.utcnow() - timedelta(days=self.days_back)
+        return datetime.now(timezone.utc) - timedelta(days=self.days_back)
 
     @property
     def end_date(self) -> datetime:
         """Calculate backtest end date."""
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
 
 
 class TradeStatus(str, Enum):

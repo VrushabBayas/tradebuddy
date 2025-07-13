@@ -4,7 +4,7 @@ Data models for TradeBuddy application.
 Defines Pydantic models for market data, signals, and analysis results.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -61,7 +61,7 @@ class SignalStrength(str, Enum):
 class BaseModelWithTimestamp(BaseModel):
     """Base model with timestamp field."""
 
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = ConfigDict(
         json_encoders={
@@ -125,7 +125,7 @@ class TechnicalIndicator(BaseModel):
     value: Union[Decimal, Dict[str, Decimal]] = Field(
         ..., description="Indicator value"
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SupportResistanceLevel(BaseModel):
@@ -151,7 +151,7 @@ class EMACrossover(BaseModel):
     crossover_strength: int = Field(
         ..., ge=1, le=10, description="Crossover strength (1-10)"
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CandlestickFormation(BaseModel):

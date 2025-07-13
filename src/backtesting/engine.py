@@ -7,7 +7,7 @@ strategy execution, portfolio management, and results analysis.
 
 import asyncio
 import structlog
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Type
 
 from src.analysis.strategies.base_strategy import BaseStrategy
@@ -107,7 +107,7 @@ class BacktestEngine:
             Complete backtesting results
         """
         logger.info("Starting backtest execution")
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             # Phase 1: Load historical data
@@ -135,7 +135,7 @@ class BacktestEngine:
             signal_quality_metrics = await self._analyze_signal_quality()
 
             # Phase 7: Compile final results
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             execution_duration = (end_time - start_time).total_seconds()
 
             result = BacktestResult(
@@ -200,8 +200,8 @@ class BacktestEngine:
             
             # Fetch historical data using get_candles method
             self.historical_data = await self.delta_client.get_candles(
-                symbol=str(self.config.symbol),
-                resolution=str(self.config.timeframe),
+                symbol=self.config.symbol.value,
+                resolution=self.config.timeframe.value,
                 start=start_date,
                 end=end_date,
             )
