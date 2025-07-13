@@ -185,17 +185,37 @@ class ComparativeAnalyzer:
                     "execution_time": None
                 }
             else:
-                analysis_result = result[1]  # Tuple: (model_type, AnalysisResult)
-                comparison_results[model_key] = {
-                    "status": "success",
-                    "error": None,
-                    "signals": analysis_result.signals,
-                    "analysis": analysis_result.ai_analysis,
-                    "primary_signal": analysis_result.primary_signal,
-                    "execution_time": getattr(analysis_result, 'execution_time', None),
-                    "signal_count": len(analysis_result.signals),
-                    "avg_confidence": self._calculate_average_confidence(analysis_result.signals)
-                }
+                try:
+                    # Ensure result is a tuple with (model_type, AnalysisResult)
+                    if isinstance(result, tuple) and len(result) == 2:
+                        analysis_result = result[1]
+                    else:
+                        # If not a tuple, assume it's the AnalysisResult directly
+                        analysis_result = result
+                    
+                    # Verify the analysis_result has required attributes
+                    if not hasattr(analysis_result, 'signals'):
+                        raise AttributeError(f"Analysis result missing 'signals' attribute. Type: {type(analysis_result)}")
+                    
+                    comparison_results[model_key] = {
+                        "status": "success",
+                        "error": None,
+                        "signals": analysis_result.signals,
+                        "analysis": getattr(analysis_result, 'ai_analysis', 'No analysis available'),
+                        "primary_signal": getattr(analysis_result, 'primary_signal', None),
+                        "execution_time": getattr(analysis_result, 'execution_time', None),
+                        "signal_count": len(analysis_result.signals),
+                        "avg_confidence": self._calculate_average_confidence(analysis_result.signals)
+                    }
+                except Exception as e:
+                    logger.error(f"Error processing result for {model_key}: {str(e)}")
+                    comparison_results[model_key] = {
+                        "status": "failed",
+                        "error": f"Result processing error: {str(e)}",
+                        "signals": [],
+                        "analysis": f"Failed to process analysis result: {str(e)}",
+                        "execution_time": None
+                    }
 
         return comparison_results
 
