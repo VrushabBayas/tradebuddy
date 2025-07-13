@@ -9,6 +9,7 @@ import structlog
 from typing import Any, Dict
 
 from src.analysis.strategies.base_strategy import BaseStrategy
+from src.analysis.ai_models.ai_interface import AIModelInterface
 from src.core.constants import TradingConstants
 from src.core.exceptions import StrategyError
 from src.core.models import AnalysisResult, MarketData, SessionConfig, StrategyType
@@ -41,12 +42,20 @@ class CombinedStrategy(BaseStrategy):
     - Conflicting strategies: 1-4 confidence
     """
 
-    def __init__(self):
-        """Initialize Combined strategy."""
-        super().__init__()
+    def __init__(self, ai_model: AIModelInterface = None):
+        """
+        Initialize Combined strategy.
+        
+        Args:
+            ai_model: AI model instance for analysis (optional, defaults to Ollama)
+        """
+        super().__init__(ai_model=ai_model)
         self.strategy_type = StrategyType.COMBINED
 
-        logger.info("Combined strategy initialized")
+        logger.info(
+            "Combined strategy initialized", 
+            ai_model=self.ai_model.model_name
+        )
 
     def _get_minimum_periods(self) -> int:
         """Combined strategy requires the most data for reliable analysis."""

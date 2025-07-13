@@ -10,6 +10,7 @@ from typing import Any, Dict
 from decimal import Decimal
 
 from src.analysis.strategies.base_strategy import BaseStrategy
+from src.analysis.ai_models.ai_interface import AIModelInterface
 from src.core.constants import TradingConstants
 from src.core.exceptions import StrategyError, DataValidationError
 from src.core.models import (
@@ -42,16 +43,20 @@ class EMACrossoverV2Strategy(BaseStrategy):
     - Risk-adaptive: ATR-based position sizing and stops
     """
 
-    def __init__(self):
-        """Initialize Enhanced EMA Crossover V2 strategy."""
-        super().__init__()
+    def __init__(self, ai_model: AIModelInterface = None):
+        """
+        Initialize Enhanced EMA Crossover V2 strategy.
+        
+        Args:
+            ai_model: AI model instance for analysis (optional, defaults to Ollama)
+        """
+        super().__init__(ai_model=ai_model)
         self.strategy_type = StrategyType.EMA_CROSSOVER_V2
 
-        # Import here to avoid circular imports
-        from src.analysis.indicators import TechnicalIndicators
-        self.technical_indicators = TechnicalIndicators()
-
-        logger.info("Enhanced EMA Crossover V2 strategy initialized")
+        logger.info(
+            "Enhanced EMA Crossover V2 strategy initialized", 
+            ai_model=self.ai_model.model_name
+        )
 
     def _get_minimum_periods(self) -> int:
         """V2 requires more data for 50 EMA and advanced analysis."""
@@ -180,27 +185,27 @@ class EMACrossoverV2Strategy(BaseStrategy):
             ohlcv_data = market_data.ohlcv_data
 
             # Core V2 metrics
-            trend_strength = self.technical_indicators.calculate_trend_strength(ohlcv_data)
-            is_trending = self.technical_indicators.is_trending_market(
+            trend_strength = self.indicators.calculate_trend_strength(ohlcv_data)
+            is_trending = self.indicators.is_trending_market(
                 ohlcv_data, ema_config.min_trend_strength
             )
-            trend_quality = self.technical_indicators.calculate_trend_quality(ohlcv_data)
+            trend_quality = self.indicators.calculate_trend_quality(ohlcv_data)
 
             # Market structure analysis
-            market_structure = self.technical_indicators.calculate_market_structure(ohlcv_data)
+            market_structure = self.indicators.calculate_market_structure(ohlcv_data)
             
             # Trend duration
-            trend_duration = self.technical_indicators.calculate_trend_duration(ohlcv_data)
+            trend_duration = self.indicators.calculate_trend_duration(ohlcv_data)
 
             # Volatility context
-            volatility_percentile = self.technical_indicators.calculate_volatility_percentile(
+            volatility_percentile = self.indicators.calculate_volatility_percentile(
                 ohlcv_data, ema_config.atr_lookback_periods
             )
 
             # Enhanced EMA calculations (9, 15, 50)
-            ema_9_values = self.technical_indicators.calculate_ema(ohlcv_data, 9)
-            ema_15_values = self.technical_indicators.calculate_ema(ohlcv_data, 15)
-            ema_50_values = self.technical_indicators.calculate_ema(ohlcv_data, 50)
+            ema_9_values = self.indicators.calculate_ema(ohlcv_data, 9)
+            ema_15_values = self.indicators.calculate_ema(ohlcv_data, 15)
+            ema_50_values = self.indicators.calculate_ema(ohlcv_data, 50)
 
             current_ema_9 = ema_9_values[-1]
             current_ema_15 = ema_15_values[-1]
@@ -213,21 +218,21 @@ class EMACrossoverV2Strategy(BaseStrategy):
                 "ema_50": current_ema_50,
                 "current_price": market_data.current_price
             }
-            ema_alignment = self.technical_indicators.detect_ema_alignment(ema_alignment_data)
+            ema_alignment = self.indicators.detect_ema_alignment(ema_alignment_data)
 
             # Enhanced RSI calculation
-            rsi_values = self.technical_indicators.calculate_rsi(ohlcv_data, ema_config.rsi_period)
+            rsi_values = self.indicators.calculate_rsi(ohlcv_data, ema_config.rsi_period)
             current_rsi = rsi_values[-1] if rsi_values else 50
 
             # Enhanced ATR calculation
-            atr_values = self.technical_indicators.calculate_atr(ohlcv_data, ema_config.atr_period)
+            atr_values = self.indicators.calculate_atr(ohlcv_data, ema_config.atr_period)
             current_atr = atr_values[-1] if atr_values else 0
 
             # Volume analysis
-            volume_analysis = self.technical_indicators.analyze_volume(ohlcv_data)
+            volume_analysis = self.indicators.analyze_volume(ohlcv_data)
 
             # Advanced candlestick analysis with timeframe context
-            candlestick_analysis = self.technical_indicators.detect_advanced_candlestick_patterns(
+            candlestick_analysis = self.indicators.detect_advanced_candlestick_patterns(
                 ohlcv_data, 
                 timeframe=market_data.timeframe,
                 atr_value=current_atr

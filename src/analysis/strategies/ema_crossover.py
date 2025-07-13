@@ -9,6 +9,7 @@ import structlog
 from typing import Any, Dict
 
 from src.analysis.strategies.base_strategy import BaseStrategy
+from src.analysis.ai_models.ai_interface import AIModelInterface
 from src.core.constants import TradingConstants
 from src.core.exceptions import StrategyError
 from src.core.models import AnalysisResult, MarketData, SessionConfig, StrategyType
@@ -35,17 +36,20 @@ class EMACrossoverStrategy(BaseStrategy):
     - WAIT: Low volume or weak crossover strength
     """
 
-    def __init__(self):
-        """Initialize EMA Crossover strategy."""
-        super().__init__()
+    def __init__(self, ai_model: AIModelInterface = None):
+        """
+        Initialize EMA Crossover strategy.
+        
+        Args:
+            ai_model: AI model instance for analysis (optional, defaults to Ollama)
+        """
+        super().__init__(ai_model=ai_model)
         self.strategy_type = StrategyType.EMA_CROSSOVER
 
-        # Import here to avoid circular imports
-        from src.analysis.indicators import TechnicalIndicators
-
-        self.technical_indicators = TechnicalIndicators()
-
-        logger.info("EMA Crossover strategy initialized")
+        logger.info(
+            "EMA Crossover strategy initialized", 
+            ai_model=self.ai_model.model_name
+        )
 
     def _get_minimum_periods(self) -> int:
         """EMA Crossover requires enough data for reliable EMA calculation."""
@@ -157,7 +161,7 @@ class EMACrossoverStrategy(BaseStrategy):
         analysis = await self._calculate_technical_analysis(market_data)
 
         # Add RSI calculation for enhanced strategy
-        rsi_values = self.technical_indicators.calculate_rsi(market_data.ohlcv_data, 14)
+        rsi_values = self.indicators.calculate_rsi(market_data.ohlcv_data, 14)
         analysis["rsi_values"] = rsi_values
 
         # Enhance with EMA specific calculations
@@ -214,14 +218,14 @@ class EMACrossoverStrategy(BaseStrategy):
             )
 
             # Calculate ATR for dynamic stop losses
-            atr_values = self.technical_indicators.calculate_atr(
+            atr_values = self.indicators.calculate_atr(
                 market_data.ohlcv_data, 14
             )
             current_atr = atr_values[-1] if atr_values else 0
 
             # Advanced Candlestick Pattern Analysis
             candlestick_analysis = (
-                self.technical_indicators.analyze_candlestick_confirmation(
+                self.indicators.analyze_candlestick_confirmation(
                     market_data.ohlcv_data
                 )
             )
@@ -845,7 +849,7 @@ class EMACrossoverStrategy(BaseStrategy):
         # Create signal if action is not neutral
         if signal_action != SignalAction.NEUTRAL:
             # Create candlestick formation object
-            candle_formation = self.technical_indicators.create_candlestick_formation(market_data.ohlcv_data)
+            candle_formation = self.indicators.create_candlestick_formation(market_data.ohlcv_data)
             
             # Add volume confirmation to formation if available
             if candle_formation:
@@ -862,7 +866,7 @@ class EMACrossoverStrategy(BaseStrategy):
                     trend_context = "downtrend"
                 
                 # Generate detailed pattern reasoning
-                pattern_reasoning = self.technical_indicators.generate_pattern_reasoning(
+                pattern_reasoning = self.indicators.generate_pattern_reasoning(
                     formation=candle_formation,
                     current_price=market_data.current_price,
                     trend_context=trend_context

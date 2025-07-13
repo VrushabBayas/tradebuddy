@@ -9,6 +9,7 @@ import structlog
 from typing import Any, Dict
 
 from src.analysis.strategies.base_strategy import BaseStrategy
+from src.analysis.ai_models.ai_interface import AIModelInterface
 from src.core.constants import TradingConstants
 from src.core.exceptions import StrategyError
 from src.core.models import AnalysisResult, MarketData, SessionConfig, StrategyType
@@ -35,12 +36,20 @@ class SupportResistanceStrategy(BaseStrategy):
     - WAIT: Unclear level interaction or low volume
     """
 
-    def __init__(self):
-        """Initialize Support/Resistance strategy."""
-        super().__init__()
+    def __init__(self, ai_model: AIModelInterface = None):
+        """
+        Initialize Support/Resistance strategy.
+        
+        Args:
+            ai_model: AI model instance for analysis (optional, defaults to Ollama)
+        """
+        super().__init__(ai_model=ai_model)
         self.strategy_type = StrategyType.SUPPORT_RESISTANCE
 
-        logger.info("Support/Resistance strategy initialized")
+        logger.info(
+            "Support/Resistance strategy initialized", 
+            ai_model=self.ai_model.model_name
+        )
 
     def _get_minimum_periods(self) -> int:
         """Support/Resistance requires more data to identify reliable levels."""
