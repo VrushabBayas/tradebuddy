@@ -267,11 +267,17 @@ class CLIApplication:
             "Latest FinGPT model", 
             "Enhanced financial analysis, Latest features"
         )
+        table.add_row(
+            "4", 
+            "Comparative Analysis ⚖️", 
+            "Run both Ollama + FinGPT", 
+            "Best of both worlds, Consensus signals"
+        )
         
         self.console.print(table)
         
         choice = Prompt.ask(
-            "\nSelect AI model", choices=["1", "2", "3"], default="1"
+            "\nSelect AI model", choices=["1", "2", "3", "4"], default="1"
         )
         
         if choice == "1":
@@ -287,16 +293,24 @@ class CLIApplication:
                 fallback_enabled=True
             )
             self.console.print("✅ Selected: FinGPT v3.2", style="green")
-        else:  # choice == "3"
+        elif choice == "3":
             ai_config = AIModelConfig(
                 model_type=AIModelType.FINGPT,
                 fingpt_model_variant="v3.3",
                 fallback_enabled=True
             )
             self.console.print("✅ Selected: FinGPT v3.3", style="green")
+        else:  # choice == "4"
+            ai_config = AIModelConfig(
+                model_type=AIModelType.FINGPT,
+                fingpt_model_variant="v3.2",
+                comparative_mode=True,
+                fallback_enabled=True
+            )
+            self.console.print("✅ Selected: Comparative Analysis (Ollama + FinGPT)", style="green")
         
-        # Ask about comparative mode
-        if ai_config.model_type == AIModelType.FINGPT:
+        # Ask about comparative mode for individual FinGPT selections
+        if ai_config.model_type == AIModelType.FINGPT and not ai_config.comparative_mode:
             comparative = Confirm.ask(
                 "\n🔍 Enable comparative mode? (Run both Ollama and FinGPT for comparison)",
                 default=False
@@ -422,9 +436,6 @@ class CLIApplication:
         self.console.print(f"\n🚀 Starting Analysis Session", style="bold green")
 
         try:
-            # Create strategy instance with AI model configuration
-            strategy_instance = self.create_strategy_with_ai_model(strategy, config.ai_model_config)
-
             # Step 1: Fetch market data
             with Progress(
                 SpinnerColumn(),
@@ -447,41 +458,11 @@ class CLIApplication:
             # Display market data summary
             self.displays.display_market_data_summary(market_data)
 
-            # Step 2: Run strategy analysis
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=self.console,
-            ) as progress:
-                task = progress.add_task("Running technical analysis...", total=None)
-
-                # Run the strategy analysis
-                analysis_result = await strategy_instance.analyze(market_data, config)
-
-                # Get AI model name for display
-                if config.ai_model_config:
-                    model_type = config.ai_model_config.model_type
-                    # Handle both enum and string values
-                    if hasattr(model_type, 'value'):
-                        ai_model_name = model_type.value.title()
-                    else:
-                        ai_model_name = str(model_type).title()
-                else:
-                    ai_model_name = "Ollama"
-                
-                progress.update(
-                    task, description=f"🧠 Generating AI analysis with {ai_model_name}..."
-                )
-                await asyncio.sleep(1)  # AI processing time
-
-                progress.update(task, description="✅ Analysis completed successfully")
-                await asyncio.sleep(0.5)
-
-            # Display analysis results
-            self.displays.display_analysis_results(analysis_result, ai_model_name)
-
-            # Display trading signals
-            self.displays.display_trading_signals(analysis_result, config)
+            # Check if comparative mode is enabled
+            if config.ai_model_config and config.ai_model_config.comparative_mode:
+                await self._run_comparative_analysis(strategy, config, market_data)
+            else:
+                await self._run_single_model_analysis(strategy, config, market_data)
 
         except Exception as e:
             logger.error("Analysis session failed", error=str(e))
@@ -495,6 +476,164 @@ class CLIApplication:
 
         # Wait for user input
         Prompt.ask("\n[dim]Press Enter to continue...[/dim]", default="")
+
+    async def _run_single_model_analysis(self, strategy: StrategyType, config: SessionConfig, market_data):
+        """Run analysis with a single AI model."""
+        # Create strategy instance with AI model configuration
+        strategy_instance = self.create_strategy_with_ai_model(strategy, config.ai_model_config)
+
+        # Step 2: Run strategy analysis
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Running technical analysis...", total=None)
+
+            # Run the strategy analysis
+            analysis_result = await strategy_instance.analyze(market_data, config)
+
+            # Get AI model name for display
+            if config.ai_model_config:
+                model_type = config.ai_model_config.model_type
+                # Handle both enum and string values
+                if hasattr(model_type, 'value'):
+                    ai_model_name = model_type.value.title()
+                else:
+                    ai_model_name = str(model_type).title()
+            else:
+                ai_model_name = "Ollama"
+            
+            progress.update(
+                task, description=f"🧠 Generating AI analysis with {ai_model_name}..."
+            )
+            await asyncio.sleep(1)  # AI processing time
+
+            progress.update(task, description="✅ Analysis completed successfully")
+            await asyncio.sleep(0.5)
+
+        # Display analysis results
+        self.displays.display_analysis_results(analysis_result, ai_model_name)
+
+        # Display trading signals
+        self.displays.display_trading_signals(analysis_result, config)
+
+    async def _run_comparative_analysis(self, strategy: StrategyType, config: SessionConfig, market_data):
+        """Run comparative analysis with multiple AI models."""
+        from src.analysis.ai_models.comparative_analyzer import ComparativeAnalyzer
+        
+        # Initialize comparative analyzer
+        comparative_analyzer = ComparativeAnalyzer()
+        
+        # Create strategy instance for technical analysis
+        strategy_instance = self.create_strategy_with_ai_model(strategy, config.ai_model_config)
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Running technical analysis...", total=None)
+
+            # Get technical analysis from strategy (without AI analysis)
+            # We'll extract technical indicators from the strategy
+            technical_analysis = await strategy_instance._calculate_technical_analysis(market_data)
+            
+            progress.update(task, description="🧠 Running comparative AI analysis...")
+            
+            # Run comparative analysis
+            comparison_results = await comparative_analyzer.analyze_with_comparison(
+                market_data=market_data,
+                technical_analysis=technical_analysis,
+                strategy_type=strategy.value,
+                session_config=config
+            )
+            
+            progress.update(task, description="✅ Comparative analysis completed")
+            await asyncio.sleep(0.5)
+
+        # Display comparative results
+        await self._display_comparative_results(comparison_results, config)
+        
+        # Cleanup
+        await comparative_analyzer.close()
+
+    async def _display_comparative_results(self, comparison_results: dict, config: SessionConfig):
+        """Display comparative analysis results."""
+        individual_results = comparison_results["individual_results"]
+        consensus = comparison_results["consensus"]
+        execution_time = comparison_results["execution_time"]
+        
+        # Display header
+        self.console.print(f"\n⚖️ Comparative AI Analysis Results", style="bold cyan")
+        self.console.print(f"📊 Execution Time: {execution_time:.2f}s", style="dim")
+        
+        # Display individual model results
+        for model_name, result in individual_results.items():
+            self.console.print(f"\n🤖 {model_name.upper()} Analysis", style="bold")
+            
+            if result["status"] == "success":
+                # Display individual analysis
+                if result.get("analysis"):
+                    panel = Panel(
+                        result["analysis"],
+                        title=f"{model_name.upper()} AI Analysis",
+                        border_style="green"
+                    )
+                    self.console.print(panel)
+                
+                # Display individual signals
+                if result.get("signals"):
+                    self.console.print(f"📈 {model_name.upper()} Signals:")
+                    for signal in result["signals"]:
+                        signal_color = "green" if signal.action.value in ["BUY"] else "red" if signal.action.value == "SELL" else "yellow"
+                        self.console.print(
+                            f"  • {signal.action.value} | Confidence: {signal.confidence}/10 | Entry: ${signal.entry_price:,.2f}",
+                            style=signal_color
+                        )
+            else:
+                self.console.print(f"  ❌ Analysis failed: {result['error']}", style="red")
+        
+        # Display consensus analysis
+        self.console.print(f"\n🎯 Consensus Analysis", style="bold cyan")
+        
+        consensus_signal = consensus["consensus_signal"]
+        agreement_level = consensus["agreement_level"]
+        recommendation = consensus["recommendation"]
+        
+        # Consensus signal panel
+        consensus_color = "green" if consensus_signal["action"] in ["BUY"] else "red" if consensus_signal["action"] == "SELL" else "yellow"
+        
+        consensus_panel = Panel(
+            f"""**Signal:** {consensus_signal['action']}
+**Confidence:** {consensus_signal['confidence']}/10
+**Agreement:** {agreement_level:.1%}
+**Reasoning:** {consensus_signal['reasoning']}
+
+**Recommendation:** {recommendation}""",
+            title="🎯 Consensus Trading Signal",
+            border_style=consensus_color
+        )
+        self.console.print(consensus_panel)
+        
+        # Model agreement details
+        if len(consensus["participating_models"]) > 1:
+            self.console.print(f"\n📋 Model Agreement Details", style="bold")
+            self.console.print(f"  • Participating Models: {', '.join(consensus['participating_models'])}")
+            if consensus["failed_models"]:
+                self.console.print(f"  • Failed Models: {', '.join(consensus['failed_models'])}", style="red")
+            self.console.print(f"  • Overall Agreement: {agreement_level:.1%}")
+        
+        # Performance metrics if available
+        performance = comparison_results.get("performance_metrics")
+        if performance:
+            self.console.print(f"\n📊 Performance Metrics", style="bold")
+            for metric, value in performance.items():
+                self.console.print(f"  • {metric}: {value}")
+                
+        # Risk management note
+        self.console.print(f"\n💡 Risk Management Note", style="bold yellow")
+        self.console.print("Always validate signals with additional analysis and use proper position sizing.", style="dim")
 
     async def ask_continue(self) -> bool:
         """Ask if user wants to continue."""
