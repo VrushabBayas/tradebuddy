@@ -27,6 +27,7 @@ from src.core.exceptions import (
     APITimeoutError,
     DataValidationError,
 )
+from src.utils.helpers import get_value, to_float
 
 logger = structlog.get_logger(__name__)
 
@@ -185,18 +186,24 @@ Candle {i+1}: O=${ohlcv.open:,.2f} H=${ohlcv.high:,.2f} L=${ohlcv.low:,.2f} C=${
         
         if strategy == StrategyType.EMA_CROSSOVER:
             ema_data = technical_analysis.get("ema_crossover", {})
+            ema_9 = to_float(get_value(ema_data, "ema_9", 0))
+            ema_15 = to_float(get_value(ema_data, "ema_15", 0))
+            is_golden_cross = get_value(ema_data, "is_golden_cross", False)
+            crossover_strength = get_value(ema_data, "crossover_strength", 0)
             prompt += f"""
-9 EMA: ${ema_data.get('ema_9', 0):,.2f}
-15 EMA: ${ema_data.get('ema_15', 0):,.2f}
-Golden Cross: {ema_data.get('is_golden_cross', False)}
-Crossover Strength: {ema_data.get('crossover_strength', 0)}/10"""
+9 EMA: ${ema_9:,.2f}
+15 EMA: ${ema_15:,.2f}
+Golden Cross: {is_golden_cross}
+Crossover Strength: {crossover_strength}/10"""
 
         elif strategy == StrategyType.SUPPORT_RESISTANCE:
             sr_levels = technical_analysis.get("support_resistance", [])
             prompt += "\nSupport/Resistance Levels:"
             for level in sr_levels[:3]:  # Top 3 levels
-                level_type = "Support" if level.get("is_support", False) else "Resistance"
-                prompt += f"\n{level_type}: ${level.get('level', 0):,.2f} (Strength: {level.get('strength', 0)}/10)"
+                level_type = "Support" if get_value(level, "is_support", False) else "Resistance"
+                level_price = to_float(get_value(level, "level", 0))
+                level_strength = get_value(level, "strength", 0)
+                prompt += f"\n{level_type}: ${level_price:,.2f} (Strength: {level_strength}/10)"
 
         # Add volume analysis
         volume_data = technical_analysis.get("volume_analysis", {})

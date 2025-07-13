@@ -212,14 +212,17 @@ class CLIDisplays:
         if latest_candle and len(market_data.ohlcv_data) >= 10:
             self._display_immediate_candlestick_analysis(market_data)
 
-    def display_analysis_results(self, analysis_result: AnalysisResult) -> None:
-        """Display analysis results."""
+    def display_analysis_results(self, analysis_result: AnalysisResult, ai_model_name: str = "Ollama") -> None:
+        """Display analysis results with dynamic AI model name."""
         self.console.print("\n🧠 AI Analysis Results", style="bold magenta")
 
+        # Dynamic title based on AI model
+        ai_title = f"🤖 {ai_model_name} AI Analysis"
+        
         # Display AI analysis text
         self.console.print(
             Panel(
-                analysis_result.ai_analysis, title="🤖 Ollama AI Analysis", style="blue"
+                analysis_result.ai_analysis, title=ai_title, style="blue"
             )
         )
 

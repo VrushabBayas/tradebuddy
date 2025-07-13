@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
-from src.analysis.strategies.ema_crossover_refactored import EMACrossoverStrategyRefactored
+from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.analysis.strategies.combined import CombinedStrategy
 from src.core.models import (
@@ -454,7 +454,7 @@ class TestOriginalVsRefactoredComparison:
     @pytest.fixture
     def refactored_strategy(self):
         """Create refactored EMA crossover strategy."""
-        return EMACrossoverStrategyRefactored()
+        return EMACrossoverV2Strategy()
 
     @pytest.fixture
     def comparison_market_data(self):

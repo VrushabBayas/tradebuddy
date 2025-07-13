@@ -458,8 +458,19 @@ class CLIApplication:
                 # Run the strategy analysis
                 analysis_result = await strategy_instance.analyze(market_data, config)
 
+                # Get AI model name for display
+                if config.ai_model_config:
+                    model_type = config.ai_model_config.model_type
+                    # Handle both enum and string values
+                    if hasattr(model_type, 'value'):
+                        ai_model_name = model_type.value.title()
+                    else:
+                        ai_model_name = str(model_type).title()
+                else:
+                    ai_model_name = "Ollama"
+                
                 progress.update(
-                    task, description="🧠 Generating AI analysis with Ollama..."
+                    task, description=f"🧠 Generating AI analysis with {ai_model_name}..."
                 )
                 await asyncio.sleep(1)  # AI processing time
 
@@ -467,7 +478,7 @@ class CLIApplication:
                 await asyncio.sleep(0.5)
 
             # Display analysis results
-            self.displays.display_analysis_results(analysis_result)
+            self.displays.display_analysis_results(analysis_result, ai_model_name)
 
             # Display trading signals
             self.displays.display_trading_signals(analysis_result, config)
