@@ -76,7 +76,7 @@ class Settings(BaseSettings):
 
     # Supported symbols and timeframes
     supported_symbols: List[str] = Field(
-        default=["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT", "DOGEUSDT"]
+        default=["BTCUSD", "ETHUSD", "SOLUSDT", "ADAUSDT", "DOGEUSDT"]
     )
     
     # Indian market symbols (INR pairs)

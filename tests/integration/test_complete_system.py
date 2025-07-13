@@ -47,7 +47,7 @@ class TestCompleteSystemIntegration:
         ]
 
         return MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=53050.0,
             ohlcv_data=ohlcv_data,
@@ -58,7 +58,7 @@ class TestCompleteSystemIntegration:
         """Create mock session configuration."""
         return SessionConfig(
             strategy=StrategyType.COMBINED,
-            symbol=Symbol.BTCUSDT,
+            symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             stop_loss_pct=3.0,
             take_profit_pct=6.0,
@@ -70,7 +70,7 @@ class TestCompleteSystemIntegration:
     def mock_analysis_result(self, mock_market_data):
         """Create mock analysis result."""
         primary_signal = TradingSignal(
-            symbol=Symbol.BTCUSDT,
+            symbol=Symbol.BTCUSD,
             strategy=StrategyType.COMBINED,
             action=SignalAction.BUY,
             strength=SignalStrength.STRONG,
@@ -80,7 +80,7 @@ class TestCompleteSystemIntegration:
         )
 
         return AnalysisResult(
-            symbol=Symbol.BTCUSDT,
+            symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             strategy=StrategyType.COMBINED,
             signals=[primary_signal],
@@ -112,14 +112,14 @@ class TestCompleteSystemIntegration:
 
                     # Step 1: Fetch market data
                     market_data = await cli_app.delta_client.get_market_data(
-                        symbol=mock_session_config.symbol.value,
+                        symbol=mock_session_config.symbol,
                         timeframe=mock_session_config.timeframe.value,
                         limit=100,
                     )
 
                     # Verify market data
                     assert market_data is not None
-                    assert market_data.symbol == "BTCUSDT"
+                    assert market_data.symbol == "BTCUSD"
                     assert market_data.timeframe == "1h"
                     assert market_data.current_price > 0
                     assert len(market_data.ohlcv_data) > 0
@@ -225,7 +225,7 @@ class TestCompleteSystemIntegration:
                 # This should handle the error gracefully
                 with pytest.raises(Exception):
                     await cli_app.delta_client.get_market_data(
-                        symbol=mock_session_config.symbol.value,
+                        symbol=mock_session_config.symbol,
                         timeframe=mock_session_config.timeframe.value,
                         limit=100,
                     )
@@ -291,7 +291,7 @@ class TestCompleteSystemIntegration:
                 for i in range(5):
                     task = asyncio.create_task(
                         cli_app.delta_client.get_market_data(
-                            symbol=mock_session_config.symbol.value,
+                            symbol=mock_session_config.symbol,
                             timeframe=mock_session_config.timeframe.value,
                             limit=100,
                         )
@@ -305,7 +305,7 @@ class TestCompleteSystemIntegration:
                 assert len(results) == 5
                 for result in results:
                     assert result is not None
-                    assert result.symbol == "BTCUSDT"
+                    assert result.symbol == "BTCUSD"
 
                 logger.info(
                     "✅ Performance test passed - handled 5 concurrent operations"

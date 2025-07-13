@@ -69,7 +69,7 @@ def sample_ohlcv():
 def sample_market_data(sample_ohlcv):
     """Sample market data for testing."""
     return MarketData(
-        symbol=Symbol.BTCUSDT,
+        symbol=Symbol.BTCUSD,
         timeframe=TimeFrame.ONE_HOUR,
         ohlcv=sample_ohlcv,
         timestamp=datetime(2024, 1, 1, 12, 0, 0),
@@ -80,7 +80,7 @@ def sample_market_data(sample_ohlcv):
 def sample_trading_signal():
     """Sample trading signal for testing."""
     return TradingSignal(
-        symbol=Symbol.BTCUSDT,
+        symbol=Symbol.BTCUSD,
         strategy=StrategyType.COMBINED,
         action=SignalAction.BUY,
         strength=SignalStrength.STRONG,
@@ -100,11 +100,13 @@ def sample_session_config():
     """Sample session configuration for testing."""
     return SessionConfig(
         strategy=StrategyType.COMBINED,
-        symbol=Symbol.BTCUSDT,
+        symbol=Symbol.BTCUSD,
         timeframe=TimeFrame.ONE_HOUR,
-        stop_loss_pct=Decimal("2.5"),
+        total_capital_inr=Decimal("100000"),
+        trading_capital_pct=Decimal("50.0"),
+        risk_per_trade_pct=Decimal("2.0"),
         take_profit_pct=Decimal("5.0"),
-        position_size_pct=Decimal("2.0"),
+        leverage=10,
         confidence_threshold=6,
         max_signals_per_session=10,
     )
@@ -361,7 +363,7 @@ def strategy_type(request):
     return request.param
 
 
-@pytest.fixture(params=[Symbol.BTCUSDT, Symbol.ETHUSDT, Symbol.SOLUSDT])
+@pytest.fixture(params=[Symbol.BTCUSD, Symbol.ETHUSD, Symbol.SOLUSDT])
 def symbol(request):
     """Parametrized symbol fixture."""
     return request.param

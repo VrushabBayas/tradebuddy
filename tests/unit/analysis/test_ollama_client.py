@@ -48,7 +48,7 @@ class TestOllamaClient:
         )
 
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[ohlcv]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[ohlcv]
         )
 
         return market_data
@@ -185,7 +185,7 @@ REASONING:
 
         # Verify
         assert isinstance(result, AnalysisResult)
-        assert result.symbol == "BTCUSDT"
+        assert result.symbol == "BTCUSD"
         assert result.strategy == StrategyType.EMA_CROSSOVER
         assert len(result.signals) > 0
 
@@ -248,7 +248,7 @@ TAKE PROFIT: $49,000
 The bearish divergence and high RSI suggest a reversal is imminent."""
 
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         signals = client._parse_trading_signals(
@@ -274,7 +274,7 @@ CONFIDENCE: 5/10
 The market is consolidating with no clear direction. Wait for better setup."""
 
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         signals = client._parse_trading_signals(
@@ -298,7 +298,7 @@ The market is consolidating with no clear direction. Wait for better setup."""
         client._session = mock_session
 
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         with pytest.raises(APIConnectionError):
@@ -313,7 +313,7 @@ The market is consolidating with no clear direction. Wait for better setup."""
         client._session = mock_session
 
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         with pytest.raises(APITimeoutError):
@@ -328,7 +328,7 @@ The market is consolidating with no clear direction. Wait for better setup."""
 
         # Market data with no OHLCV data
         empty_market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         with pytest.raises(DataValidationError, match="No OHLCV data provided"):
@@ -357,7 +357,7 @@ The market is consolidating with no clear direction. Wait for better setup."""
         )
 
         assert "EMA Crossover" in prompt
-        assert "BTCUSDT" in prompt
+        assert "BTCUSD" in prompt
         assert "$50,300" in prompt
         assert "9 EMA: $50,250" in prompt
         assert "15 EMA: $50,100" in prompt
@@ -382,7 +382,7 @@ The market is consolidating with no clear direction. Wait for better setup."""
     async def test_signal_parsing_edge_cases(self, client):
         """Test signal parsing with edge cases."""
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         # Test with malformed response
@@ -418,7 +418,7 @@ TAKE PROFIT: $50,200
 The primary signal has higher confidence due to volume confirmation."""
 
         market_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50300.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50300.0, ohlcv_data=[]
         )
 
         signals = client._parse_trading_signals(

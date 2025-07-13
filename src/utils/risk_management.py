@@ -205,6 +205,141 @@ def optimize_position_for_delta_exchange(
     }
 
 
+def calculate_stop_loss_by_risk(
+    session_config: SessionConfig,
+    entry_price: float,
+    signal_action: SignalAction,
+    desired_quantity: Optional[float] = None,
+) -> Tuple[float, float]:
+    """
+    Calculate stop loss price based on risk per trade amount.
+    
+    Formula: Stop Loss Points = Risk per Trade ÷ Quantity
+    Stop Loss Price = Entry Price ± Stop Loss Points (depending on direction)
+    
+    Args:
+        session_config: Session configuration with risk parameters
+        entry_price: Entry price for the trade
+        signal_action: BUY or SELL signal direction
+        desired_quantity: Optional specific quantity (if None, uses 1 BTC as reference)
+    
+    Returns:
+        Tuple of (stop_loss_price, stop_loss_percentage)
+    """
+    if signal_action not in [SignalAction.BUY, SignalAction.SELL]:
+        raise ValueError("Signal action must be BUY or SELL")
+    
+    # Use desired quantity or default to 1 BTC for calculation
+    quantity = desired_quantity if desired_quantity is not None else 1.0
+    
+    # Calculate risk amount per trade in INR
+    risk_amount_inr = float(session_config.risk_amount_per_trade_inr)
+    
+    # Calculate stop loss points: Risk Amount ÷ Quantity
+    stop_loss_points = risk_amount_inr / quantity
+    
+    # Calculate stop loss price based on direction
+    entry_price_float = to_float(entry_price)
+    if signal_action == SignalAction.BUY:
+        stop_loss_price = entry_price_float - stop_loss_points
+    else:  # SELL
+        stop_loss_price = entry_price_float + stop_loss_points
+    
+    # Calculate stop loss percentage
+    stop_loss_percentage = abs((stop_loss_price - entry_price_float) / entry_price_float) * 100
+    
+    logger.debug(
+        "Risk-based stop loss calculated",
+        entry_price=entry_price,
+        signal_action=signal_action.value,
+        quantity=quantity,
+        risk_amount_inr=risk_amount_inr,
+        stop_loss_points=stop_loss_points,
+        stop_loss_price=stop_loss_price,
+        stop_loss_percentage=stop_loss_percentage,
+    )
+    
+    return stop_loss_price, stop_loss_percentage
+
+
+def calculate_position_size_by_risk(
+    session_config: SessionConfig,
+    entry_price: float,
+    stop_loss_price: float,
+    current_price: Optional[float] = None,
+) -> Tuple[float, float, dict]:
+    """
+    Calculate position size using risk-based formula: Quantity = Risk per Trade / Stop Loss Points.
+    
+    This implements the user's specified risk management approach:
+    - Risk per Trade = Trading Capital × Risk per Trade %
+    - Stop Loss Points = |Entry Price - Stop Loss Price|
+    - Quantity = Risk per Trade / Stop Loss Points
+    
+    Args:
+        session_config: Session configuration with capital and risk parameters
+        entry_price: Entry price for the trade
+        stop_loss_price: Stop loss price for the trade
+        current_price: Current market price (optional, uses entry_price if not provided)
+    
+    Returns:
+        Tuple of (quantity_lots, position_value_inr, risk_breakdown_dict)
+    """
+    if current_price is None:
+        current_price = entry_price
+    
+    # Calculate stop loss points (absolute difference)
+    stop_loss_points = abs(to_float(entry_price) - to_float(stop_loss_price))
+    
+    if stop_loss_points <= 0:
+        raise ValueError("Stop loss points must be greater than zero")
+    
+    # Calculate risk amount per trade in INR
+    risk_amount_inr = float(session_config.risk_amount_per_trade_inr)
+    
+    # Calculate quantity using the formula: Quantity = Risk per Trade / Stop Loss Points
+    quantity_base = risk_amount_inr / stop_loss_points
+    
+    # Convert to lot size (minimum tradable unit)
+    min_lot_size = to_float(session_config.min_lot_size)
+    quantity_lots = max(min_lot_size, round(quantity_base / min_lot_size, 3) * min_lot_size)
+    
+    # Calculate position value in INR
+    position_value_inr = quantity_lots * to_float(current_price)
+    
+    # Calculate margin required (for leveraged trading)
+    margin_required_inr = position_value_inr / to_float(session_config.leverage)
+    
+    # Create detailed risk breakdown
+    risk_breakdown = {
+        "total_capital_inr": float(session_config.total_capital_inr),
+        "trading_capital_inr": float(session_config.trading_capital_inr),
+        "backup_capital_inr": float(session_config.backup_capital_inr),
+        "risk_per_trade_pct": float(session_config.risk_per_trade_pct),
+        "risk_amount_inr": risk_amount_inr,
+        "stop_loss_points": stop_loss_points,
+        "quantity_base": quantity_base,
+        "quantity_lots": quantity_lots,
+        "position_value_inr": position_value_inr,
+        "margin_required_inr": margin_required_inr,
+        "effective_leverage": position_value_inr / float(session_config.trading_capital_inr),
+        "risk_reward_ratio": to_float(session_config.take_profit_pct) / to_float(session_config.stop_loss_pct),
+    }
+    
+    logger.debug(
+        "Risk-based position size calculated",
+        entry_price=entry_price,
+        stop_loss_price=stop_loss_price,
+        stop_loss_points=stop_loss_points,
+        risk_amount_inr=risk_amount_inr,
+        quantity_lots=quantity_lots,
+        position_value_inr=position_value_inr,
+        margin_required_inr=margin_required_inr,
+    )
+    
+    return quantity_lots, position_value_inr, risk_breakdown
+
+
 def validate_position_safety(
     session_config: SessionConfig,
     position_params: dict,

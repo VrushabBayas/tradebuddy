@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.utils.data_helpers import (
+from src.utils.helpers import (
     calculate_distance_percentage,
     calculate_percentage_change,
     extract_nested_value,

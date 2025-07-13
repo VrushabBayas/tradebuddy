@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.utils.type_conversion import (
+from src.utils.helpers import (
     clamp_value,
     decimal_to_percentage,
     ensure_positive,

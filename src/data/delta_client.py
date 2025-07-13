@@ -272,11 +272,12 @@ class DeltaExchangeClient:
         latest_candle = candles[0]
         
         # Calculate expected maximum age based on timeframe
-        # Be more lenient during off-hours and weekends
+        # Be strict for minute timeframes to ensure fresh data
         if timeframe.endswith('m'):
             timeframe_minutes = int(timeframe[:-1])
-            # For minute timeframes, allow more buffer during off-hours
-            max_age_minutes = max(timeframe_minutes * 5, 30)  # At least 30 minutes buffer
+            # For minute timeframes, allow only 2x the timeframe for fresh data
+            # This ensures 1-minute data is max 2 minutes old, 5-minute data max 10 minutes old
+            max_age_minutes = timeframe_minutes * 2
         elif timeframe.endswith('h'):
             timeframe_hours = int(timeframe[:-1])
             max_age_minutes = timeframe_hours * 60 * 3  # 3x timeframe for hourly data
@@ -491,8 +492,12 @@ class DeltaExchangeClient:
             limit=limit
         )
         
-        # Calculate time range for candles with microsecond precision to ensure uniqueness
-        end_time = datetime.now(timezone.utc)
+        # Calculate time range for candles - request slightly in the future to get latest data
+        current_time = datetime.now(timezone.utc)
+        
+        # Set end_time to 2 minutes in the future to ensure we get the absolute latest candle
+        # This accounts for potential API delays and ensures we don't miss the current candle
+        end_time = current_time + timedelta(minutes=2)
         
         # Add small random jitter (0-999 microseconds) to ensure unique time windows
         jitter_microseconds = random.randint(0, 999)
@@ -579,8 +584,24 @@ class DeltaExchangeClient:
             current_price = float(candles[0].close)
             logger.info("Using latest candle close price as fallback", current_price=current_price)
         
-        # Validate data freshness
+        # Validate data freshness with enhanced logging
         self._validate_data_freshness(candles, symbol, timeframe)
+        
+        # Log detailed timing information for debugging
+        if candles:
+            latest_candle = candles[0]  # Assuming newest first (verified by diagnostic)
+            current_utc = datetime.now(timezone.utc)
+            age_minutes = (current_utc - latest_candle.timestamp).total_seconds() / 60
+            
+            logger.info(
+                "Market data timing analysis",
+                symbol=symbol,
+                timeframe=timeframe,
+                latest_candle_time=latest_candle.timestamp.isoformat(),
+                current_utc_time=current_utc.isoformat(),
+                data_age_minutes=round(age_minutes, 2),
+                note="Compare with live chart for discrepancies"
+            )
         
         # Create MarketData object
         market_data = MarketData(

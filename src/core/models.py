@@ -109,9 +109,13 @@ class MarketData(BaseModelWithTimestamp):
 
     @property
     def latest_ohlcv(self) -> Optional[OHLCV]:
-        """Get the most recent OHLCV data."""
-        # Delta Exchange returns data in reverse chronological order (newest first)
-        return self.ohlcv_data[0] if self.ohlcv_data else None
+        """Get the most recent OHLCV data by timestamp."""
+        if not self.ohlcv_data:
+            return None
+        
+        # Find the candle with the maximum timestamp to ensure we get the latest
+        # This is more robust than assuming index 0 is always the newest
+        return max(self.ohlcv_data, key=lambda candle: candle.timestamp)
 
 
 class TechnicalIndicator(BaseModel):
@@ -366,6 +370,20 @@ class SessionConfig(BaseModel):
     symbol: Symbol = Field(..., description="Trading symbol")
     timeframe: TimeFrame = Field(..., description="Analysis timeframe")
 
+    # Capital Management (risk-based approach)
+    total_capital_inr: Decimal = Field(
+        default=Decimal("100000"),
+        description="Total available capital in INR (e.g., ₹1,00,000)",
+    )
+    trading_capital_pct: Decimal = Field(
+        default=Decimal("50.0"),
+        description="Percentage of total capital used for trading (e.g., 50%)",
+    )
+    risk_per_trade_pct: Decimal = Field(
+        default=Decimal("2.0"),
+        description="Risk percentage per trade of trading capital (e.g., 2%)",
+    )
+    
     # Risk management (optimized for 10x leverage crypto trading)
     stop_loss_pct: Decimal = Field(
         default=Decimal("1.5"),
@@ -377,7 +395,7 @@ class SessionConfig(BaseModel):
     )
     position_size_pct: Decimal = Field(
         default=Decimal("5.0"),
-        description="Position size percentage (higher for leverage trading)",
+        description="Position size percentage (legacy - use risk-based calculation)",
     )
 
     # Leverage and position sizing
@@ -405,6 +423,21 @@ class SessionConfig(BaseModel):
     )
 
     model_config = ConfigDict(use_enum_values=True)
+    
+    @property
+    def trading_capital_inr(self) -> Decimal:
+        """Calculate trading capital in INR."""
+        return self.total_capital_inr * (self.trading_capital_pct / Decimal("100"))
+    
+    @property
+    def risk_amount_per_trade_inr(self) -> Decimal:
+        """Calculate risk amount per trade in INR."""
+        return self.trading_capital_inr * (self.risk_per_trade_pct / Decimal("100"))
+    
+    @property
+    def backup_capital_inr(self) -> Decimal:
+        """Calculate backup capital (not used for trading) in INR."""
+        return self.total_capital_inr - self.trading_capital_inr
 
 
 class RealTimeConfig(BaseModel):

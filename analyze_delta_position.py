@@ -21,7 +21,7 @@ async def analyze_delta_position():
         print("🔍 Analyzing Delta Exchange BTC contract details...")
         
         # Get ticker data to analyze contract specifications
-        ticker = await client.get_ticker("BTCUSDT")
+        ticker = await client.get_ticker("BTCUSD")
         
         # Find BTC perpetual contract
         btc_contract = None

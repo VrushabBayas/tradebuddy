@@ -147,27 +147,37 @@ class CLIDisplays:
         return table
 
     def display_configuration_summary(self, config: SessionConfig) -> None:
-        """Display configuration summary."""
+        """Display enhanced configuration summary with risk-based capital management."""
         self.console.print("\n📋 Configuration Summary", style="bold cyan")
 
         summary_table = Table(title="Session Configuration")
-        summary_table.add_column("Parameter", style="cyan", width=20)
-        summary_table.add_column("Value", style="white", width=20)
+        summary_table.add_column("Parameter", style="cyan", width=25)
+        summary_table.add_column("Value", style="white", width=25)
 
-        # Handle strategy display (Pydantic converts enums to strings)
+        # Trading Configuration
         strategy_name = str(config.strategy)
         summary_table.add_row("Strategy", strategy_name.replace("_", " ").title())
 
-        # Handle symbol display (Pydantic converts enums to strings)
         symbol_name = str(config.symbol)
         summary_table.add_row("Symbol", symbol_name)
 
-        # Handle timeframe display (Pydantic converts enums to strings)
         timeframe_name = str(config.timeframe)
         summary_table.add_row("Timeframe", timeframe_name)
-        summary_table.add_row("Stop Loss", f"{config.stop_loss_pct}%")
+        
+        # Capital Management
+        summary_table.add_row("", "")  # Separator
+        summary_table.add_row("[bold]Capital Management[/bold]", "")
+        summary_table.add_row("Total Capital", f"₹{config.total_capital_inr:,.0f}")
+        summary_table.add_row("Trading Capital", f"₹{config.trading_capital_inr:,.0f} ({config.trading_capital_pct}%)")
+        summary_table.add_row("Backup Capital", f"₹{config.backup_capital_inr:,.0f}")
+        summary_table.add_row("Risk per Trade", f"₹{config.risk_amount_per_trade_inr:,.0f} ({config.risk_per_trade_pct}%)")
+        
+        # Position Parameters
+        summary_table.add_row("", "")  # Separator
+        summary_table.add_row("[bold]Position Parameters[/bold]", "")
+        summary_table.add_row("Stop Loss", "🧮 Calculated by risk amount")
         summary_table.add_row("Take Profit", f"{config.take_profit_pct}%")
-        summary_table.add_row("Position Size", f"{config.position_size_pct}%")
+        summary_table.add_row("Leverage", f"{config.leverage}x")
 
         self.console.print(summary_table)
 
@@ -328,18 +338,112 @@ class CLIDisplays:
         self.display_risk_management_reminder(config)
 
     def display_risk_management_reminder(self, config: SessionConfig) -> None:
-        """Display risk management reminder."""
+        """Display enhanced risk management with capital breakdown."""
         self.console.print(
             Panel(
-                f"⚠️ [bold]Risk Management Reminder[/bold]\n\n"
-                f"• Position Size: {config.position_size_pct}% of portfolio\n"
-                f"• Stop Loss: {config.stop_loss_pct}% from entry\n"
+                f"💰 [bold]Capital Management[/bold]\n"
+                f"• Total Capital: ₹{config.total_capital_inr:,.0f}\n"
+                f"• Trading Capital: ₹{config.trading_capital_inr:,.0f} ({config.trading_capital_pct}%)\n"
+                f"• Backup Capital: ₹{config.backup_capital_inr:,.0f}\n"
+                f"• Risk per Trade: ₹{config.risk_amount_per_trade_inr:,.0f} ({config.risk_per_trade_pct}%)\n\n"
+                f"📊 [bold]Position Parameters[/bold]\n"
+                f"• Stop Loss: 🧮 Calculated based on risk amount per trade\n"
                 f"• Take Profit: {config.take_profit_pct}% from entry\n"
+                f"• Leverage: {config.leverage}x\n\n"
+                f"⚠️ [bold]Risk Disclaimer[/bold]\n"
                 f"• These are educational signals only\n"
                 f"• Always do your own research\n"
                 f"• Never risk more than you can afford to lose",
-                title="⚠️ Risk Management",
+                title="🛡️ Risk Management",
                 style="red",
+            )
+        )
+
+    def display_position_sizing_details(self, quantity_lots: float, position_value_inr: float, risk_breakdown: dict) -> None:
+        """Display detailed position sizing calculation results."""
+        self.console.print("\n🎯 Position Sizing Calculation", style="bold cyan")
+        
+        # Create position sizing table
+        sizing_table = Table(title="Risk-Based Position Calculation")
+        sizing_table.add_column("Parameter", style="cyan", width=25)
+        sizing_table.add_column("Value", style="white", width=20)
+        sizing_table.add_column("Details", style="dim", width=30)
+        
+        # Capital breakdown
+        sizing_table.add_row(
+            "Total Capital",
+            f"₹{risk_breakdown['total_capital_inr']:,.0f}",
+            "Available capital"
+        )
+        sizing_table.add_row(
+            "Trading Capital",
+            f"₹{risk_breakdown['trading_capital_inr']:,.0f}",
+            f"{risk_breakdown['total_capital_inr'] * risk_breakdown['risk_per_trade_pct'] / 100:.0f}% of total"
+        )
+        sizing_table.add_row(
+            "Risk Amount",
+            f"₹{risk_breakdown['risk_amount_inr']:,.0f}",
+            f"{risk_breakdown['risk_per_trade_pct']}% of trading capital"
+        )
+        sizing_table.add_row(
+            "Stop Loss Points",
+            f"${risk_breakdown['stop_loss_points']:,.2f}",
+            "Entry to stop loss distance"
+        )
+        
+        # Position calculation
+        sizing_table.add_row(
+            "Calculated Quantity",
+            f"{risk_breakdown['quantity_base']:.6f}",
+            "Risk Amount ÷ Stop Loss Points"
+        )
+        sizing_table.add_row(
+            "Adjusted Quantity",
+            f"{quantity_lots:.6f}",
+            "Rounded to minimum lot size"
+        )
+        sizing_table.add_row(
+            "Position Value",
+            f"₹{position_value_inr:,.0f}",
+            "Quantity × Current Price"
+        )
+        sizing_table.add_row(
+            "Margin Required",
+            f"₹{risk_breakdown['margin_required_inr']:,.0f}",
+            f"Position Value ÷ {risk_breakdown.get('leverage', 10)}x leverage"
+        )
+        sizing_table.add_row(
+            "Effective Leverage",
+            f"{risk_breakdown['effective_leverage']:.2f}x",
+            "Position Value ÷ Trading Capital"
+        )
+        sizing_table.add_row(
+            "Risk/Reward Ratio",
+            f"{risk_breakdown['risk_reward_ratio']:.2f}:1",
+            "Take Profit % ÷ Stop Loss %"
+        )
+        
+        self.console.print(sizing_table)
+        
+        # Risk validation summary
+        effective_leverage = risk_breakdown['effective_leverage']
+        if effective_leverage > 2.0:
+            leverage_status = "[red]⚠️ High[/red]"
+        elif effective_leverage > 1.0:
+            leverage_status = "[yellow]📊 Moderate[/yellow]"
+        else:
+            leverage_status = "[green]✅ Conservative[/green]"
+            
+        self.console.print(
+            Panel(
+                f"📊 [bold]Position Summary[/bold]\n"
+                f"Formula Used: Quantity = Risk Amount ÷ Stop Loss Points\n"
+                f"Risk Amount: ₹{risk_breakdown['risk_amount_inr']:,.0f}\n"
+                f"Stop Loss Distance: ${risk_breakdown['stop_loss_points']:,.2f}\n"
+                f"Final Quantity: {quantity_lots:.6f} lots\n"
+                f"Leverage Status: {leverage_status}",
+                title="💡 Calculation Summary",
+                style="blue",
             )
         )
 
@@ -428,19 +532,6 @@ class CLIDisplays:
                 candle_table.add_row("Volume Status", "⚠️ No Volume Data")
             
             self.console.print(candle_table)
-            
-            # Add educational note
-            if formation and formation.is_strong_pattern:
-                self.console.print(
-                    Panel(
-                        f"🎓 [bold]Pattern Education[/bold]\n"
-                        f"{formation.visual_description}\n\n"
-                        f"This pattern suggests {formation.signal_direction.replace('_', ' ')} sentiment "
-                        f"and will be used as input for technical analysis.",
-                        title="📚 Educational Context",
-                        style="blue",
-                    )
-                )
                 
         except Exception as e:
             self.console.print(f"⚠️ Could not analyze candlestick pattern: {e}", style="yellow")

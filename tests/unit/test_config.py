@@ -26,7 +26,7 @@ class TestSettings:
         assert settings.delta_exchange_api_url == "https://api.delta.exchange"
         assert settings.ollama_api_url == "http://localhost:11434"
         assert settings.ollama_model == "qwen2.5:14b"
-        assert settings.default_symbol == "BTCUSDT"
+        assert settings.default_symbol == "BTCUSD"
         assert settings.default_timeframe == "1h"
         assert settings.default_strategy == "combined"
 
@@ -35,14 +35,14 @@ class TestSettings:
         # Set environment variables
         os.environ["PYTHON_ENV"] = "production"
         os.environ["LOG_LEVEL"] = "ERROR"
-        os.environ["DEFAULT_SYMBOL"] = "ETHUSDT"
+        os.environ["DEFAULT_SYMBOL"] = "ETHUSD"
         os.environ["OLLAMA_MODEL"] = "custom-model"
 
         settings = Settings()
 
         assert settings.python_env == "production"
         assert settings.log_level == "ERROR"
-        assert settings.default_symbol == "ETHUSDT"
+        assert settings.default_symbol == "ETHUSD"
         assert settings.ollama_model == "custom-model"
 
     def test_python_env_validation(self):
@@ -80,8 +80,8 @@ class TestSettings:
     def test_symbol_validation(self):
         """Test symbol validation."""
         # Valid default symbol
-        settings = Settings(default_symbol="BTCUSDT")
-        assert settings.default_symbol == "BTCUSDT"
+        settings = Settings(default_symbol="BTCUSD")
+        assert settings.default_symbol == "BTCUSD"
 
         # Invalid default symbol
         with pytest.raises(ValidationError) as exc_info:
@@ -190,8 +190,8 @@ class TestSettings:
         """Test supported symbols, timeframes, and strategies lists."""
         settings = Settings()
 
-        assert "BTCUSDT" in settings.supported_symbols
-        assert "ETHUSDT" in settings.supported_symbols
+        assert "BTCUSD" in settings.supported_symbols
+        assert "ETHUSD" in settings.supported_symbols
         assert "SOLUSDT" in settings.supported_symbols
 
         assert "1m" in settings.supported_timeframes
@@ -242,7 +242,7 @@ class TestSettingsIntegration:
         env_file.write_text(
             "PYTHON_ENV=production\n"
             "LOG_LEVEL=ERROR\n"
-            "DEFAULT_SYMBOL=ETHUSDT\n"
+            "DEFAULT_SYMBOL=ETHUSD\n"
             "OLLAMA_MODEL=custom-model\n"
         )
 
@@ -255,7 +255,7 @@ class TestSettingsIntegration:
 
             assert settings.python_env == "production"
             assert settings.log_level == "ERROR"
-            assert settings.default_symbol == "ETHUSDT"
+            assert settings.default_symbol == "ETHUSD"
             assert settings.ollama_model == "custom-model"
         finally:
             os.chdir(original_cwd)

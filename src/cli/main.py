@@ -7,6 +7,7 @@ Provides interactive terminal interface for trading strategy selection and analy
 import asyncio
 import os
 import sys
+from decimal import Decimal
 from typing import Optional
 
 import structlog
@@ -169,9 +170,12 @@ class CLIApplication:
             strategy=strategy,
             symbol=symbol,
             timeframe=timeframe,
-            stop_loss_pct=risk_params["stop_loss"],
-            take_profit_pct=risk_params["take_profit"],
-            position_size_pct=risk_params["position_size"],
+            total_capital_inr=Decimal(str(risk_params["total_capital_inr"])),
+            trading_capital_pct=Decimal(str(risk_params["trading_capital_pct"])),
+            risk_per_trade_pct=Decimal(str(risk_params["risk_per_trade_pct"])),
+            stop_loss_pct=Decimal("1.5"),  # Placeholder - will be calculated dynamically based on risk
+            take_profit_pct=Decimal(str(risk_params["take_profit"])),
+            leverage=risk_params["leverage"],
         )
 
         # Display configuration summary
@@ -231,16 +235,35 @@ class CLIApplication:
         return selected_timeframe
 
     async def configure_risk_parameters(self) -> dict:
-        """Configure risk management parameters."""
-        self.console.print("\n⚠️ Risk Management Configuration", style="bold yellow")
-
-        # Stop loss percentage
-        stop_loss = Prompt.ask(
-            "Stop Loss percentage",
-            default=str(settings.default_stop_loss),
+        """Configure risk-based capital management parameters."""
+        self.console.print("\n💰 Risk Management Configuration", style="bold yellow")
+        
+        # Capital Management Configuration
+        self.console.print("\n📊 [bold]Capital Allocation[/bold]")
+        
+        # Total capital in INR
+        total_capital = Prompt.ask(
+            "Total Capital (₹)",
+            default="100000",
             show_default=True,
         )
-
+        
+        # Trading capital percentage
+        trading_capital_pct = Prompt.ask(
+            "Trading Capital percentage (% of total)",
+            default="50.0",
+            show_default=True,
+        )
+        
+        # Risk per trade percentage
+        risk_per_trade_pct = Prompt.ask(
+            "Risk per Trade (% of trading capital)",
+            default="2.0",
+            show_default=True,
+        )
+        
+        self.console.print("\n📈 [bold]Position Parameters[/bold]")
+        
         # Take profit percentage
         take_profit = Prompt.ask(
             "Take Profit percentage",
@@ -248,26 +271,51 @@ class CLIApplication:
             show_default=True,
         )
 
-        # Position size percentage
-        position_size = Prompt.ask(
-            "Position Size percentage", default="2.0", show_default=True
+        # Leverage setting
+        leverage = Prompt.ask(
+            "Leverage (1-100x)",
+            default="10",
+            show_default=True,
         )
+        
+        # Note: Stop loss is now automatically calculated based on risk per trade
+        self.console.print("💡 [dim]Stop loss will be calculated automatically based on your risk per trade amount[/dim]")
 
         try:
             risk_params = {
-                "stop_loss": float(stop_loss),
+                "total_capital_inr": float(total_capital),
+                "trading_capital_pct": float(trading_capital_pct),
+                "risk_per_trade_pct": float(risk_per_trade_pct),
                 "take_profit": float(take_profit),
-                "position_size": float(position_size),
+                "leverage": int(leverage),
             }
 
-            # Validate risk parameters
-            if risk_params["stop_loss"] <= 0 or risk_params["stop_loss"] > 20:
-                raise ValueError("Stop loss must be between 0 and 20%")
+            # Validate capital management parameters
+            if risk_params["total_capital_inr"] <= 0:
+                raise ValueError("Total capital must be positive")
+            if risk_params["trading_capital_pct"] <= 0 or risk_params["trading_capital_pct"] > 100:
+                raise ValueError("Trading capital percentage must be between 0 and 100%")
+            if risk_params["risk_per_trade_pct"] <= 0 or risk_params["risk_per_trade_pct"] > 10:
+                raise ValueError("Risk per trade must be between 0 and 10%")
+            
+            # Validate position parameters
             if risk_params["take_profit"] <= 0 or risk_params["take_profit"] > 50:
                 raise ValueError("Take profit must be between 0 and 50%")
-            if risk_params["position_size"] <= 0 or risk_params["position_size"] > 10:
-                raise ValueError("Position size must be between 0 and 10%")
+            if risk_params["leverage"] < 1 or risk_params["leverage"] > 100:
+                raise ValueError("Leverage must be between 1 and 100x")
 
+            # Calculate and display summary
+            trading_capital_inr = risk_params["total_capital_inr"] * (risk_params["trading_capital_pct"] / 100)
+            risk_amount_inr = trading_capital_inr * (risk_params["risk_per_trade_pct"] / 100)
+            backup_capital_inr = risk_params["total_capital_inr"] - trading_capital_inr
+            
+            self.console.print(f"\n📋 [bold]Capital Summary[/bold]")
+            self.console.print(f"  • Total Capital: ₹{risk_params['total_capital_inr']:,.0f}")
+            self.console.print(f"  • Trading Capital: ₹{trading_capital_inr:,.0f} ({risk_params['trading_capital_pct']}%)")
+            self.console.print(f"  • Backup Capital: ₹{backup_capital_inr:,.0f}")
+            self.console.print(f"  • Risk per Trade: ₹{risk_amount_inr:,.0f} ({risk_params['risk_per_trade_pct']}%)")
+            self.console.print(f"  • Leverage: {risk_params['leverage']}x")
+            
             self.console.print("✅ Risk parameters configured", style="green")
             return risk_params
 

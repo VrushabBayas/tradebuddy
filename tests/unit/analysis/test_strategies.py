@@ -49,7 +49,7 @@ class TestBaseStrategy:
             ohlcv_data.append(ohlcv)
 
         return MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=52000.0,
             ohlcv_data=ohlcv_data,
@@ -60,7 +60,7 @@ class TestBaseStrategy:
         """Create sample session configuration."""
         return SessionConfig(
             strategy=StrategyType.SUPPORT_RESISTANCE,
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             stop_loss_pct=2.5,
             take_profit_pct=5.0,
@@ -105,7 +105,7 @@ class TestBaseStrategy:
         strategy = BaseStrategy()
 
         invalid_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50000.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50000.0, ohlcv_data=[]
         )
 
         with pytest.raises(DataValidationError, match="No OHLCV data provided"):
@@ -178,7 +178,7 @@ class TestSupportResistanceStrategy:
             ohlcv_data.append(ohlcv)
 
         return MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=51000.0,
             ohlcv_data=ohlcv_data,
@@ -189,7 +189,7 @@ class TestSupportResistanceStrategy:
         """Create session config for S/R strategy."""
         return SessionConfig(
             strategy=StrategyType.SUPPORT_RESISTANCE,
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             confidence_threshold=6,
         )
@@ -207,13 +207,13 @@ class TestSupportResistanceStrategy:
         """Test analysis with mocked Ollama response."""
         # Mock Ollama client response
         mock_analysis_result = AnalysisResult(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             strategy=StrategyType.SUPPORT_RESISTANCE,
             market_data=sample_market_data,
             signals=[
                 TradingSignal(
-                    symbol="BTCUSDT",
+                    symbol="BTCUSD",
                     strategy=StrategyType.SUPPORT_RESISTANCE,
                     action=SignalAction.BUY,
                     strength="MODERATE",
@@ -246,7 +246,7 @@ class TestSupportResistanceStrategy:
     async def test_analyze_with_invalid_data(self, strategy, session_config):
         """Test analysis with invalid market data."""
         invalid_data = MarketData(
-            symbol="BTCUSDT", timeframe="1h", current_price=50000.0, ohlcv_data=[]
+            symbol="BTCUSD", timeframe="1h", current_price=50000.0, ohlcv_data=[]
         )
 
         with pytest.raises(DataValidationError):
@@ -283,7 +283,7 @@ class TestEMACrossoverStrategy:
             ohlcv_data.append(ohlcv)
 
         return MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=53000.0,
             ohlcv_data=ohlcv_data,
@@ -294,7 +294,7 @@ class TestEMACrossoverStrategy:
         """Create session config for EMA strategy."""
         return SessionConfig(
             strategy=StrategyType.EMA_CROSSOVER,
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             confidence_threshold=6,
         )
@@ -312,13 +312,13 @@ class TestEMACrossoverStrategy:
         """Test analysis with golden cross scenario."""
         # Mock Ollama response for golden cross
         mock_analysis_result = AnalysisResult(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             strategy=StrategyType.EMA_CROSSOVER,
             market_data=sample_market_data,
             signals=[
                 TradingSignal(
-                    symbol="BTCUSDT",
+                    symbol="BTCUSD",
                     strategy=StrategyType.EMA_CROSSOVER,
                     action=SignalAction.BUY,
                     strength="STRONG",
@@ -368,7 +368,7 @@ class TestEMACrossoverStrategy:
             ohlcv_data.append(ohlcv)
 
         bearish_data = MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=50000.0,
             ohlcv_data=ohlcv_data,
@@ -376,13 +376,13 @@ class TestEMACrossoverStrategy:
 
         # Mock Ollama response for death cross
         mock_analysis_result = AnalysisResult(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             strategy=StrategyType.EMA_CROSSOVER,
             market_data=bearish_data,
             signals=[
                 TradingSignal(
-                    symbol="BTCUSDT",
+                    symbol="BTCUSD",
                     strategy=StrategyType.EMA_CROSSOVER,
                     action=SignalAction.SELL,
                     strength="MODERATE",
@@ -445,7 +445,7 @@ class TestCombinedStrategy:
             ohlcv_data.append(ohlcv)
 
         return MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=51400.0,
             ohlcv_data=ohlcv_data,
@@ -456,7 +456,7 @@ class TestCombinedStrategy:
         """Create session config for Combined strategy."""
         return SessionConfig(
             strategy=StrategyType.COMBINED,
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             confidence_threshold=7,  # Higher threshold for combined
         )
@@ -474,13 +474,13 @@ class TestCombinedStrategy:
         """Test analysis with high confidence signal from both strategies."""
         # Mock Ollama response for combined signal
         mock_analysis_result = AnalysisResult(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             strategy=StrategyType.COMBINED,
             market_data=sample_market_data,
             signals=[
                 TradingSignal(
-                    symbol="BTCUSDT",
+                    symbol="BTCUSD",
                     strategy=StrategyType.COMBINED,
                     action=SignalAction.BUY,
                     strength="STRONG",
@@ -515,13 +515,13 @@ class TestCombinedStrategy:
         """Test analysis when strategies provide conflicting signals."""
         # Mock Ollama response for conflicting signals
         mock_analysis_result = AnalysisResult(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             strategy=StrategyType.COMBINED,
             market_data=sample_market_data,
             signals=[
                 TradingSignal(
-                    symbol="BTCUSDT",
+                    symbol="BTCUSD",
                     strategy=StrategyType.COMBINED,
                     action=SignalAction.NEUTRAL,
                     strength="WEAK",
@@ -550,7 +550,7 @@ class TestCombinedStrategy:
         """Test analysis with insufficient data for combined strategy."""
         # Create minimal data (not enough for reliable combined analysis)
         minimal_data = MarketData(
-            symbol="BTCUSDT",
+            symbol="BTCUSD",
             timeframe="1h",
             current_price=50000.0,
             ohlcv_data=[
