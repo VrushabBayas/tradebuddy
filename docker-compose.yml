@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # TradeBuddy main application
   tradebuddy:
@@ -10,11 +8,11 @@ services:
     restart: unless-stopped
     environment:
       - PYTHON_ENV=production
-      - DELTA_API_KEY=${DELTA_API_KEY}
-      - DELTA_API_SECRET=${DELTA_API_SECRET}
+      - DELTA_API_KEY=${DELTA_API_KEY:-}
+      - DELTA_API_SECRET=${DELTA_API_SECRET:-}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
       - FINGPT_API_ENDPOINT=${FINGPT_API_ENDPOINT:-http://fingpt-api:8000}
-      - FINGPT_API_KEY=${FINGPT_API_KEY}
+      - FINGPT_API_KEY=${FINGPT_API_KEY:-}
     volumes:
       - ./backtest_reports:/app/backtest_reports
       - ./logs:/app/logs
@@ -36,11 +34,11 @@ services:
     environment:
       - PYTHON_ENV=development
       - DEBUG=true
-      - DELTA_API_KEY=${DELTA_API_KEY}
-      - DELTA_API_SECRET=${DELTA_API_SECRET}
+      - DELTA_API_KEY=${DELTA_API_KEY:-}
+      - DELTA_API_SECRET=${DELTA_API_SECRET:-}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
       - FINGPT_API_ENDPOINT=${FINGPT_API_ENDPOINT:-http://fingpt-api:8000}
-      - FINGPT_API_KEY=${FINGPT_API_KEY}
+      - FINGPT_API_KEY=${FINGPT_API_KEY:-}
     volumes:
       - .:/app
       - ./backtest_reports:/app/backtest_reports
