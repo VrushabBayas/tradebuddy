@@ -617,12 +617,20 @@ class CLIApplication:
         self.console.print(consensus_panel)
         
         # Model agreement details
-        if len(consensus["participating_models"]) > 1:
+        participating_models = consensus.get("participating_models", [])
+        failed_models = consensus.get("failed_models", [])
+        
+        if len(participating_models) > 1:
             self.console.print(f"\n📋 Model Agreement Details", style="bold")
-            self.console.print(f"  • Participating Models: {', '.join(consensus['participating_models'])}")
-            if consensus["failed_models"]:
-                self.console.print(f"  • Failed Models: {', '.join(consensus['failed_models'])}", style="red")
+            self.console.print(f"  • Participating Models: {', '.join(participating_models)}")
+            if failed_models:
+                self.console.print(f"  • Failed Models: {', '.join(failed_models)}", style="red")
             self.console.print(f"  • Overall Agreement: {agreement_level:.1%}")
+        elif len(participating_models) == 1:
+            self.console.print(f"\n📋 Single Model Analysis", style="bold")
+            self.console.print(f"  • Model Used: {participating_models[0]}")
+            if failed_models:
+                self.console.print(f"  • Failed Models: {', '.join(failed_models)}", style="red")
         
         # Performance metrics if available
         performance = comparison_results.get("performance_metrics")
