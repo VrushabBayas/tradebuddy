@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     ollama_model: str = Field(default="qwen2.5:14b", env="OLLAMA_MODEL")
 
     # FinGPT Configuration
-    fingpt_api_endpoint: str = Field(default="http://localhost:8000", env="FINGPT_API_ENDPOINT")
+    fingpt_api_endpoint: str = Field(default="http://localhost:8001", env="FINGPT_API_ENDPOINT")
     fingpt_model_variant: str = Field(default="v3.2", env="FINGPT_MODEL_VARIANT") 
     fingpt_api_key: Optional[str] = Field(default=None, env="FINGPT_API_KEY")
     fingpt_timeout: int = Field(default=30, env="FINGPT_TIMEOUT")

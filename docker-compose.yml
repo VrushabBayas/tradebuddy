@@ -79,7 +79,7 @@ services:
     container_name: tradebuddy-fingpt
     restart: unless-stopped
     environment:
-      - FINGPT_MODEL_VARIANT=${FINGPT_MODEL_VARIANT:-v3.2}
+      - FINGPT_MODEL_VARIANT=${FINGPT_MODEL_VARIANT:-v3.3}
       - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
       - TRANSFORMERS_CACHE=/app/model_cache
     volumes:
@@ -91,9 +91,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 16G
+          memory: 24G
         reservations:
-          memory: 8G
+          memory: 12G
     profiles:
       - fingpt
 
