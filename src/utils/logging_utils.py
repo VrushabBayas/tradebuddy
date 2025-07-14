@@ -87,7 +87,6 @@ def setup_cli_logging():
         'src.analysis.indicators',
         'src.analysis.strategies.base_strategy', 
         'src.analysis.strategies.support_resistance',
-        'src.analysis.strategies.ema_crossover',
         'src.analysis.strategies.ema_crossover_v2',
         'src.analysis.strategies.combined',
         'src.data.delta_client',

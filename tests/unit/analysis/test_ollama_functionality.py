@@ -54,7 +54,7 @@ class TestOllamaClientFunctionality:
     def session_config(self):
         """Create session configuration."""
         return SessionConfig(
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             total_capital_inr=Decimal("100000"),
@@ -186,7 +186,7 @@ class TestOllamaClientFunctionality:
         for response_text in test_responses:
             try:
                 # Test signal parsing method if it exists
-                signals = ollama_client._parse_signals(response_text, "BTCUSD", StrategyType.EMA_CROSSOVER)
+                signals = ollama_client._parse_signals(response_text, "BTCUSD", StrategyType.EMA_CROSSOVER_V2)
                 
                 # Should parse at least some signals
                 assert isinstance(signals, list)
@@ -313,7 +313,7 @@ class TestOllamaClientFunctionality:
     def test_strategy_context_functionality(self, ollama_client):
         """Test that client can handle different strategy contexts."""
         strategies = [
-            StrategyType.EMA_CROSSOVER,
+            StrategyType.EMA_CROSSOVER_V2,
             StrategyType.SUPPORT_RESISTANCE,
             StrategyType.COMBINED
         ]
@@ -328,7 +328,7 @@ class TestOllamaClientFunctionality:
                 assert len(context) > 0
                 
                 # Should contain strategy-relevant terms
-                if strategy == StrategyType.EMA_CROSSOVER:
+                if strategy == StrategyType.EMA_CROSSOVER_V2:
                     assert "ema" in context.lower() or "moving average" in context.lower()
                 elif strategy == StrategyType.SUPPORT_RESISTANCE:
                     assert "support" in context.lower() or "resistance" in context.lower()
@@ -337,7 +337,7 @@ class TestOllamaClientFunctionality:
                     
             except AttributeError:
                 # Method might not exist - test basic strategy handling
-                assert strategy in [StrategyType.EMA_CROSSOVER, StrategyType.SUPPORT_RESISTANCE, StrategyType.COMBINED]
+                assert strategy in [StrategyType.EMA_CROSSOVER_V2, StrategyType.SUPPORT_RESISTANCE, StrategyType.COMBINED]
 
     @pytest.mark.asyncio
     async def test_multiple_signals_functionality(self, ollama_client, sample_market_data, session_config):

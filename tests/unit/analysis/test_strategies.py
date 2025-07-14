@@ -10,9 +10,9 @@ import pytest
 from src.analysis.strategies import (
     BaseStrategy,
     CombinedStrategy,
-    EMACrossoverStrategy,
     SupportResistanceStrategy,
 )
+from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.core.exceptions import DataValidationError, StrategyError
 from src.core.models import (
     OHLCV,
@@ -253,13 +253,13 @@ class TestSupportResistanceStrategy:
             await strategy.analyze(invalid_data, session_config)
 
 
-class TestEMACrossoverStrategy:
+class TestEMACrossoverV2Strategy:
     """Test cases for EMA Crossover strategy."""
 
     @pytest.fixture
     def strategy(self):
         """Create EMA Crossover strategy instance."""
-        return EMACrossoverStrategy()
+        return EMACrossoverV2Strategy()
 
     @pytest.fixture
     def sample_market_data(self):

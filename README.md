@@ -194,7 +194,7 @@ tradebuddy/
 │   ├── unit/                   # Behavior-focused unit tests
 │   │   ├── analysis/           # AI analysis and strategy testing
 │   │   ├── cli/               # Complete CLI workflow testing
-│   │   ├── data/              # API and WebSocket functionality
+│   │   ├── data/              # API functionality
 │   │   └── backtesting/       # Risk management and backtesting
 │   ├── integration/            # End-to-end system integration tests
 │   └── fixtures/               # Shared test data and configurations
@@ -378,7 +378,7 @@ tests/
 │   ├── cli/
 │   │   └── test_cli_workflow_functionality.py # Complete user journeys
 │   ├── data/
-│   │   └── test_data_functionality.py        # API & WebSocket functionality
+│   │   └── test_data_functionality.py        # API functionality
 │   ├── backtesting/
 │   │   └── test_backtesting_functionality.py # Risk management & backtesting
 │   └── test_edge_cases_functionality.py      # Error handling & edge cases
@@ -392,7 +392,7 @@ tests/
 
 1. **AI Analysis Testing**: Market data analysis, prompt generation, AI response validation
 2. **CLI Workflow Testing**: Complete user journeys, strategy execution, real-time modes
-3. **Data Processing Testing**: Delta Exchange API, WebSocket streaming, data validation
+3. **Data Processing Testing**: Delta Exchange API, data validation
 4. **Risk Management Testing**: Position sizing, stop loss/take profit, leverage calculations
 5. **Edge Case Testing**: Invalid data, network errors, extreme values, concurrent operations
 
@@ -462,7 +462,6 @@ Delta Exchange API → Market Data → Technical Analysis → AI Analysis → Si
 ## 🚀 Future Enhancements
 
 ### Planned Features
-- **Real-time WebSocket**: For tick-by-tick data streaming
 - **Advanced Backtesting**: Historical performance analysis
 - **Portfolio Management**: Multiple position tracking
 - **Performance Analytics**: Detailed performance metrics

@@ -10,10 +10,9 @@ TradeBuddy is a **production-ready** AI-powered trading signal analysis system t
 
 ✅ **Production Ready**: Complete implementation with modular architecture  
 ✅ **Live Data Integration**: Real-time market data from Delta Exchange API  
-✅ **WebSocket Streaming**: Live candlestick data with real-time analysis  
-✅ **Market Monitoring**: Continuous monitoring mode with automated alerts  
+  
 ✅ **AI Analysis**: Local Ollama integration with Qwen2.5:14b model  
-✅ **Interactive CLI**: Rich terminal interface with 6 operation modes  
+✅ **Interactive CLI**: Rich terminal interface with 5 operation modes  
 ✅ **Risk Management**: Optimized for 10x leverage with proper position sizing  
 ✅ **Modular Architecture**: Clean separation of concerns and reusable components  
 ✅ **Type Safety**: Comprehensive Pydantic models and configuration management  
@@ -31,10 +30,8 @@ TradeBuddy is a **production-ready** AI-powered trading signal analysis system t
 2. **EMA Crossover Analysis** - Trend change detection with 9/15 EMA
 3. **EMA Crossover V2 Analysis** - Enhanced EMA strategy with trend filtering and market structure analysis
 4. **Combined Strategy** - High-confidence signals from multiple strategies
-5. **Real-Time Analysis ⭐** - Live market streaming (5-60 minutes)
-6. **Market Monitoring 🔄** - Continuous monitoring with automated alerts
-7. **Backtesting Mode** - Historical strategy performance analysis
-8. **Exit** - Clean application termination
+4. **Backtesting Mode** - Historical strategy performance analysis
+5. **Exit** - Clean application termination
 
 ## Architecture Overview
 
@@ -42,8 +39,7 @@ TradeBuddy is a **production-ready** AI-powered trading signal analysis system t
 ```
 src/
 ├── cli/
-│   ├── main.py           # Main CLI application with 8 operation modes
-│   ├── realtime.py       # Real-time analysis & monitoring (785 lines)
+│   ├── main.py           # Main CLI application with 5 operation modes
 │   └── displays.py       # Centralized display utilities (271 lines)
 ├── core/
 │   ├── models.py         # Pydantic models with enhanced strategy configs
@@ -51,7 +47,6 @@ src/
 │   └── constants.py      # Trading constants and parameters
 ├── data/
 │   ├── delta_client.py   # Delta Exchange API client (200 candle default)
-│   └── websocket_client.py # WebSocket streaming client
 ├── analysis/
 │   ├── strategies/       # Four trading strategy implementations
 │   │   ├── ema_crossover.py     # Original EMA crossover (9/15)
@@ -79,16 +74,8 @@ src/
 - `realtime.py`: Real-time streaming and continuous monitoring modes  
 - `displays.py`: Reusable UI components and formatting utilities
 
-**Real-Time Capabilities**:
-- **Live Streaming**: WebSocket candlestick data from Delta Exchange
-- **Buffer Management**: Configurable OHLCV data buffers (20-200 candles)
-- **Strategy Analysis**: Real-time application of trading strategies
-- **Monitoring Mode**: Continuous multi-symbol monitoring with alerts
-
 **Configuration Models**:
-- `RealTimeConfig`: Type-safe real-time session configuration
-- `MonitoringConfig`: Continuous monitoring parameters and behavior
-- `SessionConfig`: Traditional analysis session parameters
+- `SessionConfig`: Analysis session parameters
 
 ## Essential Development Commands
 
@@ -118,55 +105,6 @@ make run-dev                   # Development mode with debug logging
 make run-demo                  # System demonstration
 ```
 
-## Real-Time Features
-
-### Live Market Analysis (Option 5)
-```bash
-# Interactive session configuration:
-Strategy: EMA Crossover, EMA Crossover V2, or Combined Strategy
-Symbol: BTCUSDT (default), ETHUSDT, SOLUSDT, ADAUSDT, DOGEUSDT  
-Timeframe: 1m (default for real-time)
-Duration: 5-60 minutes
-Buffer Size: 20-200 candles (default: 100)
-```
-
-**Features**:
-- Historical data pre-loading for context
-- Live WebSocket candlestick streaming  
-- Real-time strategy analysis on each new candle
-- Live signal generation with confidence scoring
-- Interactive session with progress tracking
-
-### Continuous Market Monitoring (Option 6)
-```bash
-# Multi-symbol monitoring configuration:
-Strategy: EMA Crossover, EMA Crossover V2, or Combined Strategy
-Symbols: Multi-select (comma-separated, e.g., 1,2,3)
-Signal Threshold: 5-10 confidence level for alerts
-Refresh Interval: 30-300 seconds between analyses
-Display: Compact or detailed alert format
-```
-
-**Features**:
-- Multi-symbol simultaneous monitoring
-- Configurable signal confidence thresholds
-- Automated alert system for high-confidence signals
-- Signal history tracking (last 50 signals per symbol)
-- Continuous operation until manually stopped (Ctrl+C)
-- Periodic analysis with customizable intervals
-
-### Configuration Models
-
-**RealTimeConfig** (`src/core/models.py`):
-- Session-based real-time analysis (5-60 minutes)
-- Single symbol focus with intensive analysis
-- Buffer management for live candlestick processing
-
-**MonitoringConfig** (`src/core/models.py`):
-- Multi-symbol continuous monitoring  
-- Configurable alert thresholds and intervals
-- Signal history and session statistics
-- Display customization options
 
 ## Recent Major Updates (Latest Changes)
 
@@ -190,16 +128,15 @@ Display: Compact or detailed alert format
   - Enhanced base strategy class with improved market analysis
 
 ### Architecture Enhancements
-- **Expanded Strategy Options**: Now 4 distinct strategies (up from 3)
+- **Simplified Strategy Options**: Now 3 distinct strategies
 - **Enhanced Configuration**: Updated models with V2 strategy parameters
 - **Improved Buffer Management**: Default 200 historical candles for better context
 - **Type Safety**: Comprehensive Pydantic V2 validation
 - **Test Coverage**: 90%+ coverage with functionality-focused testing
 
 ### Modular Architecture (Previous Implementation)
-- **Real-Time Module**: `src/cli/realtime.py` (785 lines)
 - **Display System**: `src/cli/displays.py` (271 lines)  
-- **Streamlined CLI**: `src/cli/main.py` with 8 operation modes
+- **Streamlined CLI**: `src/cli/main.py` with 5 operation modes
 - **Shared Utilities**: `src/utils/` with data helpers and type conversions
 
 ## Usage Patterns
@@ -208,7 +145,7 @@ Display: Compact or detailed alert format
 ```bash
 make setup-env    # One-time setup
 make run          # Start application
-# Select option 4 or 5 for real-time features
+# Select option 3 for combined strategy analysis
 ```
 
 ### Development Workflow
@@ -225,17 +162,12 @@ make run-dev      # development mode with debug logging
 - Update `StrategyType` enum in `src/core/models.py`
 - Register strategy in CLI application (`src/cli/main.py`)
 
-### Real-Time Development  
-- Modify `src/cli/realtime.py` for streaming/monitoring logic
-- Update `src/core/models.py` for configuration changes
-- Use `src/cli/displays.py` for UI component additions
-
 ### Analysis Module Development
 - Add indicators to `src/analysis/indicators.py`
 - Enhance market analysis in `src/analysis/ema_analysis.py` or `market_context.py`
 - Use shared utilities from `src/utils/` for data handling and type safety
 
-The system is now **production-ready** with comprehensive real-time capabilities, modular architecture, and robust monitoring features for professional cryptocurrency trading analysis.
+The system is now **production-ready** with modular architecture and robust analysis features for professional cryptocurrency trading.
 
 ## Testing Infrastructure
 
@@ -256,7 +188,7 @@ tests/
 │   ├── cli/
 │   │   └── test_cli_workflow_functionality.py # End-to-end CLI workflows
 │   ├── data/
-│   │   └── test_data_functionality.py        # Data processing & WebSocket
+│   │   └── test_data_functionality.py        # Data processing
 │   ├── backtesting/
 │   │   └── test_backtesting_functionality.py # Risk management & backtesting
 │   └── test_edge_cases_functionality.py      # Edge cases & error handling
@@ -277,12 +209,10 @@ tests/
 **2. CLI Workflow Testing** (`test_cli_workflow_functionality.py`):
 - Complete user journeys through the application
 - Strategy selection and execution flows
-- Real-time mode and monitoring mode workflows
 - Interactive CLI component behavior
 
 **3. Data Processing Tests** (`test_data_functionality.py`):
 - Delta Exchange API integration
-- WebSocket streaming functionality
 - Data validation and error handling
 - Market data retrieval and processing
 

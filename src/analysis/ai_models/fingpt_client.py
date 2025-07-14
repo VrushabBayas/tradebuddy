@@ -188,7 +188,7 @@ Candle {i+1}: O=${ohlcv.open:,.2f} H=${ohlcv.high:,.2f} L=${ohlcv.low:,.2f} C=${
         # Add technical indicators based on strategy
         prompt += "\n\nTECHNICAL INDICATORS:"
         
-        if strategy == StrategyType.EMA_CROSSOVER:
+        if strategy == StrategyType.EMA_CROSSOVER_V2:
             ema_data = technical_analysis.get("ema_crossover", {})
             ema_9 = to_float(get_value(ema_data, "ema_9", 0))
             ema_15 = to_float(get_value(ema_data, "ema_15", 0))

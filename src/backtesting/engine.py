@@ -11,7 +11,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Type
 
 from src.analysis.strategies.base_strategy import BaseStrategy
-from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
 from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.analysis.strategies.combined import CombinedStrategy
@@ -90,7 +89,6 @@ class BacktestEngine:
     def _create_strategy(self, strategy_type: StrategyType) -> BaseStrategy:
         """Create strategy instance based on type."""
         strategy_map: Dict[StrategyType, Type[BaseStrategy]] = {
-            StrategyType.EMA_CROSSOVER: EMACrossoverStrategy,
             StrategyType.EMA_CROSSOVER_V2: EMACrossoverV2Strategy,
             StrategyType.SUPPORT_RESISTANCE: SupportResistanceStrategy,
             StrategyType.COMBINED: CombinedStrategy,
@@ -474,7 +472,7 @@ class BacktestEngine:
         # Strategy-specific metrics
         strategy_metrics = {}
         
-        if self.config.strategy_type == StrategyType.EMA_CROSSOVER:
+        if self.config.strategy_type == StrategyType.EMA_CROSSOVER_V2:
             strategy_metrics = self._analyze_ema_strategy()
         elif self.config.strategy_type == StrategyType.SUPPORT_RESISTANCE:
             strategy_metrics = self._analyze_sr_strategy()

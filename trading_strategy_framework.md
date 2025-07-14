@@ -52,14 +52,14 @@ Use **Ollama Qwen2.5:14b** to analyze **Delta Exchange live data** and generate 
 ### Delta Exchange Live Data Integration
 **Platform**: Delta Exchange - Professional crypto derivatives platform
 **API Documentation**: https://docs.delta.exchange/
-**WebSocket Streams**: Real-time market data feed
+**Historical Data**: Market data from REST API
 **REST API**: Historical and current market data
 
 ### Available Market Data from Delta Exchange
 - **Symbols**: BTC, ETH, SOL, and 100+ crypto futures/perpetuals
 - **Timeframes**: 1m, 5m, 15m, 1h, 4h, 1d
 - **Data Points**: OHLCV (Open, High, Low, Close, Volume)
-- **Real-time Updates**: WebSocket for live price feeds
+- **Market Data**: REST API for OHLCV data
 - **Historical Data**: Up to 1000 candles per request
 
 ### Required Data Structure
@@ -79,7 +79,7 @@ Use **Ollama Qwen2.5:14b** to analyze **Delta Exchange live data** and generate 
 - **Account**: Free account for market data access
 - **API Keys**: Not required for public market data
 - **Rate Limits**: 10 requests/second for REST API
-- **WebSocket**: Unlimited real-time data streams
+- **REST API**: Historical OHLCV data access
 - **Documentation**: https://docs.delta.exchange/
 
 ---
@@ -134,7 +134,7 @@ The Qwen2.5:14b model should analyze formatted market data:
 - Symbol (e.g., BTCUSDT, ETHUSDT)
 - Timeframe and timestamp
 - Recent price action from last 50-100 candles
-- Current live price from WebSocket feed
+- Current price from latest OHLCV data
 
 **Technical Indicators (Mode-Dependent):**
 - **Mode 1**: S/R levels identified from Delta Exchange historical data, volume patterns
@@ -315,7 +315,7 @@ Provide clear, actionable trading signals with specific entry/exit levels.
 2. **API Access**: Public market data available without API keys
 3. **Documentation**: Review API docs at https://docs.delta.exchange/
 4. **Rate Limits**: Respect 10 requests/second limit for REST API
-5. **WebSocket**: Use for real-time data (unlimited connections)
+5. **REST API**: Use for historical OHLCV data
 
 ### Ollama Model Setup
 1. **Installation**: Download Ollama from https://ollama.ai/
@@ -343,7 +343,7 @@ Provide clear, actionable trading signals with specific entry/exit levels.
 
 ### Step 2: Data Connection
 1. Test Delta Exchange REST API for historical data
-2. Implement WebSocket connection for live data
+2. Implement REST API calls for historical data
 3. Create data processing pipeline for EMA calculations
 4. Build support/resistance level identification
 
@@ -370,7 +370,7 @@ Provide clear, actionable trading signals with specific entry/exit levels.
 - **Qwen2.5 Model**: https://ollama.ai/library/qwen2.5:14b
 - **Delta Exchange**: https://www.delta.exchange/
 - **Delta API Docs**: https://docs.delta.exchange/
-- **WebSocket Guide**: https://docs.delta.exchange/#websocket-api
+- **REST API Guide**: https://docs.delta.exchange/#rest-api
 
 ---
 
@@ -378,7 +378,7 @@ Provide clear, actionable trading signals with specific entry/exit levels.
 
 ### Delta Exchange Data Management
 - **Data Quality**: Ensure consistent data feeds from Delta Exchange API
-- **Latency Optimization**: Use WebSocket for real-time data instead of polling REST API
+- **Data Efficiency**: Use appropriate timeframes for analysis
 - **Backup Plans**: Have alternative data sources ready if Delta Exchange is down
 - **Rate Limiting**: Respect API limits to avoid being blocked
 - **Data Validation**: Always verify data integrity before feeding to AI model
@@ -428,7 +428,7 @@ Provide clear, actionable trading signals with specific entry/exit levels.
 
 **Delta Exchange API Issues:**
 - Connection timeouts: Implement retry logic with exponential backoff
-- Rate limiting: Use WebSocket for real-time data, REST for historical
+- Rate limiting: Manage REST API call frequency appropriately
 - Data gaps: Build data validation and gap-filling mechanisms
 - Server maintenance: Have backup data sources ready
 

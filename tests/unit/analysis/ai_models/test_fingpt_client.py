@@ -81,7 +81,7 @@ class TestFinGPTClient:
             await fingpt_client.analyze_market(
                 market_data=None,
                 technical_analysis={},
-                strategy=StrategyType.EMA_CROSSOVER
+                strategy=StrategyType.EMA_CROSSOVER_V2
             )
 
         # Test with empty OHLCV data
@@ -95,7 +95,7 @@ class TestFinGPTClient:
             await fingpt_client.analyze_market(
                 market_data=invalid_market_data,
                 technical_analysis={},
-                strategy=StrategyType.EMA_CROSSOVER
+                strategy=StrategyType.EMA_CROSSOVER_V2
             )
 
     @pytest.mark.asyncio
@@ -165,7 +165,7 @@ class TestFinGPTClient:
             await fingpt_client.analyze_market(
                 market_data=sample_market_data,
                 technical_analysis=sample_technical_analysis,
-                strategy=StrategyType.EMA_CROSSOVER
+                strategy=StrategyType.EMA_CROSSOVER_V2
             )
 
     @pytest.mark.asyncio
@@ -179,7 +179,7 @@ class TestFinGPTClient:
             await fingpt_client.analyze_market(
                 market_data=sample_market_data,
                 technical_analysis=sample_technical_analysis,
-                strategy=StrategyType.EMA_CROSSOVER
+                strategy=StrategyType.EMA_CROSSOVER_V2
             )
 
     @pytest.mark.asyncio

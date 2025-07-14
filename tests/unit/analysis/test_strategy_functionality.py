@@ -10,7 +10,6 @@ from decimal import Decimal
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
 from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.analysis.strategies.combined import CombinedStrategy
@@ -26,7 +25,7 @@ class TestEMACrossoverFunctionality:
     @pytest.fixture
     def strategy(self):
         """Create EMA crossover strategy."""
-        return EMACrossoverStrategy()
+        return EMACrossoverV2Strategy()
 
     @pytest.fixture
     def market_data_bullish(self):
@@ -84,7 +83,7 @@ class TestEMACrossoverFunctionality:
     def session_config(self):
         """Create session configuration."""
         return SessionConfig(
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             total_capital_inr=Decimal("100000"),
@@ -97,7 +96,7 @@ class TestEMACrossoverFunctionality:
     @pytest.mark.asyncio
     async def test_strategy_initialization(self, strategy):
         """Test that strategy initializes correctly."""
-        assert strategy.strategy_type == StrategyType.EMA_CROSSOVER
+        assert strategy.strategy_type == StrategyType.EMA_CROSSOVER_V2
         assert strategy.indicators is not None
         assert strategy.ollama_client is not None
 
@@ -110,7 +109,7 @@ class TestEMACrossoverFunctionality:
                 signals=[
                     TradingSignal(
                         symbol=Symbol.BTCUSD,
-                        strategy=StrategyType.EMA_CROSSOVER,
+                        strategy=StrategyType.EMA_CROSSOVER_V2,
                         action=SignalAction.BUY,
                         strength="STRONG",
                         confidence=8,
@@ -141,7 +140,7 @@ class TestEMACrossoverFunctionality:
                 signals=[
                     TradingSignal(
                         symbol=Symbol.BTCUSD,
-                        strategy=StrategyType.EMA_CROSSOVER,
+                        strategy=StrategyType.EMA_CROSSOVER_V2,
                         action=SignalAction.SELL,
                         strength="STRONG",
                         confidence=7,
@@ -385,7 +384,7 @@ class TestStrategyErrorHandling:
     def session_config(self):
         """Create session configuration."""
         return SessionConfig(
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             total_capital_inr=Decimal("100000"),
@@ -449,7 +448,7 @@ class TestOriginalVsRefactoredComparison:
     @pytest.fixture
     def original_strategy(self):
         """Create original EMA crossover strategy."""
-        return EMACrossoverStrategy()
+        return EMACrossoverV2Strategy()
 
     @pytest.fixture
     def refactored_strategy(self):
@@ -484,7 +483,7 @@ class TestOriginalVsRefactoredComparison:
     def comparison_session_config(self):
         """Create session configuration for comparison."""
         return SessionConfig(
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             total_capital_inr=Decimal("100000"),
@@ -506,7 +505,7 @@ class TestOriginalVsRefactoredComparison:
         assert refactored_result is not None
         
         # Both should have same strategy type
-        assert original_result.strategy == refactored_result.strategy == StrategyType.EMA_CROSSOVER
+        assert original_result.strategy == refactored_result.strategy == StrategyType.EMA_CROSSOVER_V2
         
         # Both should process the same market data
         assert original_result.symbol == refactored_result.symbol

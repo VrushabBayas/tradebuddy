@@ -21,7 +21,6 @@ from src.core.exceptions import (
 )
 from src.analysis.indicators import TechnicalIndicators
 from src.data.delta_client import DeltaExchangeClient
-from src.data.websocket_client import DeltaWebSocketClient
 from src.utils.risk_management import calculate_leveraged_position_size
 from src.utils.helpers import to_decimal, to_float, safe_float_conversion
 
@@ -310,77 +309,6 @@ class TestAPIErrorHandling:
                     pass
 
 
-class TestWebSocketErrorHandling:
-    """Test WebSocket error handling and resilience."""
-
-    @pytest.fixture
-    def websocket_client(self):
-        """Create WebSocket client for testing."""
-        return DeltaWebSocketClient()
-
-    @pytest.mark.asyncio
-    async def test_websocket_connection_failures(self, websocket_client):
-        """Test WebSocket connection failure handling."""
-        connection_failures = [
-            ConnectionRefusedError("Connection refused"),
-            ConnectionResetError("Connection reset"),
-            OSError("Network error"),
-        ]
-        
-        for failure in connection_failures:
-            with patch('websockets.connect', side_effect=failure):
-                try:
-                    await websocket_client.connect()
-                    
-                except (APIConnectionError, ConnectionRefusedError, ConnectionResetError, OSError):
-                    # Should handle connection failures gracefully
-                    pass
-
-    @pytest.mark.asyncio
-    async def test_websocket_message_corruption(self, websocket_client):
-        """Test handling of corrupted WebSocket messages."""
-        corrupted_messages = [
-            b'\x80\x81\x82',  # Invalid UTF-8
-            '{"incomplete": json',
-            '',
-            None,
-            123,  # Invalid message type
-        ]
-        
-        for corrupted_message in corrupted_messages:
-            try:
-                parsed = websocket_client._parse_message(corrupted_message)
-                
-                # Should handle corrupted messages gracefully
-                assert parsed is None or isinstance(parsed, dict)
-                
-            except (json.JSONDecodeError, ValueError, TypeError):
-                # Corrupted messages should be handled gracefully
-                pass
-
-    @pytest.mark.asyncio
-    async def test_websocket_reconnection_failures(self, websocket_client):
-        """Test WebSocket reconnection failure scenarios."""
-        # Simulate multiple consecutive failures
-        failure_count = 0
-        
-        def failing_connect():
-            nonlocal failure_count
-            failure_count += 1
-            if failure_count <= 5:
-                raise ConnectionRefusedError("Still failing")
-            return AsyncMock()  # Eventually succeed
-        
-        with patch('websockets.connect', side_effect=failing_connect):
-            try:
-                await websocket_client.connect()
-                
-                # Should either succeed after retries or fail gracefully
-                assert failure_count >= 1
-                
-            except Exception:
-                # Multiple failures should be handled gracefully
-                pass
 
 
 class TestStrategyErrorHandling:
@@ -542,7 +470,7 @@ class TestSignalProcessingEdgeCases:
         conflicting_signals = [
             TradingSignal(
                 symbol=Symbol.BTCUSD,
-                strategy=StrategyType.EMA_CROSSOVER,
+                strategy=StrategyType.EMA_CROSSOVER_V2,
                 action=SignalAction.BUY,
                 strength="STRONG",
                 confidence=9,
@@ -608,7 +536,7 @@ class TestSignalProcessingEdgeCases:
             try:
                 signal = TradingSignal(
                     symbol=Symbol.BTCUSD,
-                    strategy=StrategyType.EMA_CROSSOVER,
+                    strategy=StrategyType.EMA_CROSSOVER_V2,
                     action=SignalAction.BUY,
                     strength="MODERATE",
                     confidence=confidence,
@@ -635,7 +563,7 @@ class TestSignalProcessingEdgeCases:
             try:
                 signal = TradingSignal(
                     symbol=Symbol.BTCUSD,
-                    strategy=StrategyType.EMA_CROSSOVER,
+                    strategy=StrategyType.EMA_CROSSOVER_V2,
                     action=SignalAction.BUY,
                     strength="MODERATE",
                     confidence=7,

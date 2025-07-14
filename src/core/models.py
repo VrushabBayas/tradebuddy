@@ -37,7 +37,6 @@ class StrategyType(str, Enum):
     """Available trading strategies."""
 
     SUPPORT_RESISTANCE = "support_resistance"
-    EMA_CROSSOVER = "ema_crossover"
     EMA_CROSSOVER_V2 = "ema_crossover_v2"
     COMBINED = "combined"
 
@@ -507,76 +506,6 @@ class SessionConfig(BaseModel):
         """Calculate backup capital (not used for trading) in INR."""
         return self.total_capital_inr - self.trading_capital_inr
 
-
-class RealTimeConfig(BaseModel):
-    """Configuration for real-time analysis sessions."""
-
-    strategy: StrategyType = Field(
-        ..., description="Strategy to use for real-time analysis"
-    )
-    symbol: Symbol = Field(default=Symbol.BTCUSD, description="Trading symbol")
-    timeframe: TimeFrame = Field(
-        default=TimeFrame.ONE_MINUTE, description="Analysis timeframe"
-    )
-    duration_minutes: int = Field(
-        default=5, ge=1, le=60, description="Session duration in minutes"
-    )
-    buffer_size: int = Field(default=50, ge=20, le=100, description="OHLCV buffer size")
-    confidence_threshold: int = Field(
-        default=5, ge=1, le=10, description="Minimum confidence for signals"
-    )
-
-    # Real-time specific settings
-    historical_candles: int = Field(
-        default=100, ge=20, le=200, description="Historical candles to preload"
-    )
-    max_analysis_count: int = Field(
-        default=50, ge=1, le=200, description="Maximum number of analyses per session"
-    )
-
-    model_config = ConfigDict(use_enum_values=True)
-
-
-class MonitoringConfig(BaseModel):
-    """Configuration for continuous market monitoring mode."""
-
-    strategy: StrategyType = Field(..., description="Strategy to use for monitoring")
-    symbols: List[Symbol] = Field(
-        default=[Symbol.BTCUSD], description="Symbols to monitor"
-    )
-    timeframe: TimeFrame = Field(
-        default=TimeFrame.ONE_MINUTE, description="Monitoring timeframe"
-    )
-
-    # Monitoring behavior
-    signal_threshold: int = Field(
-        default=7, ge=5, le=10, description="Minimum confidence for alerts"
-    )
-    refresh_interval: int = Field(
-        default=60, ge=30, le=300, description="Refresh interval in seconds"
-    )
-    max_signals_per_hour: int = Field(
-        default=10, ge=1, le=50, description="Maximum signals per hour per symbol"
-    )
-
-    # Display settings
-    show_neutral_signals: bool = Field(
-        default=False, description="Show neutral/wait signals"
-    )
-    compact_display: bool = Field(
-        default=True, description="Use compact display format"
-    )
-    auto_scroll: bool = Field(default=True, description="Auto-scroll to latest signals")
-
-    # Buffer and history
-    buffer_size: int = Field(
-        default=100, ge=50, le=200, description="OHLCV buffer size for analysis"
-    )
-    historical_candles: int = Field(
-        default=100, ge=30, le=200, description="Historical candles to preload"
-    )
-
-    model_config = ConfigDict(use_enum_values=True)
 
 
 class SessionResults(BaseModelWithTimestamp):

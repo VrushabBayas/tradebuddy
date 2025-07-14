@@ -354,7 +354,7 @@ def strategy_test_cases():
 @pytest.fixture(
     params=[
         StrategyType.SUPPORT_RESISTANCE,
-        StrategyType.EMA_CROSSOVER,
+        StrategyType.EMA_CROSSOVER_V2,
         StrategyType.COMBINED,
     ]
 )

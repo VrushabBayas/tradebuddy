@@ -22,7 +22,6 @@ from rich.text import Text
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.analysis.strategies.combined import CombinedStrategy
-from src.analysis.strategies.ema_crossover import EMACrossoverStrategy
 from src.analysis.strategies.ema_crossover_v2 import EMACrossoverV2Strategy
 from src.analysis.strategies.support_resistance import SupportResistanceStrategy
 from src.analysis.ai_models.model_factory import ModelFactory
@@ -30,12 +29,10 @@ from src.backtesting.engine import BacktestEngine
 from src.backtesting.models import BacktestConfig
 from src.backtesting.reports import BacktestReportGenerator
 from src.cli.displays import CLIDisplays
-from src.cli.realtime import RealTimeAnalyzer
 from src.core.config import settings
 from src.core.exceptions import CLIError
 from src.core.models import SessionConfig, StrategyType, Symbol, TimeFrame, AIModelType, AIModelConfig
 from src.data.delta_client import DeltaExchangeClient
-from src.data.websocket_client import DeltaWebSocketClient
 from src.utils.logging_utils import analysis_progress, setup_cli_logging
 
 console = Console()
@@ -49,20 +46,11 @@ class CLIApplication:
         self.console = console
         self.running = True
         self.delta_client = DeltaExchangeClient()
-        self.websocket_client = DeltaWebSocketClient()
         # Strategies will be created dynamically with AI model configuration
         self.strategies = {}
 
         # Display utilities
         self.displays = CLIDisplays(self.console)
-
-        # Real-time analyzer
-        self.realtime_analyzer = RealTimeAnalyzer(
-            console=self.console,
-            delta_client=self.delta_client,
-            websocket_client=self.websocket_client,
-            strategies=self.strategies,
-        )
 
         # Setup optimized logging for CLI
         setup_cli_logging()
@@ -78,13 +66,7 @@ class CLIApplication:
                 if strategy is None:
                     break
 
-                if strategy == "REALTIME":
-                    # Real-time analysis flow
-                    await self.realtime_analyzer.run_session()
-                elif strategy == "MONITORING":
-                    # Continuous monitoring flow
-                    await self.realtime_analyzer.run_monitoring_session()
-                elif strategy == "BACKTESTING":
+                if strategy == "BACKTESTING":
                     # Backtesting flow
                     await self.run_backtesting_session()
                 else:
@@ -127,27 +109,20 @@ class CLIApplication:
 
         # Get user choice
         choice = Prompt.ask(
-            "\nSelect strategy", choices=["1", "2", "3", "4", "5", "6", "7", "8"], default="4"
+            "\nSelect strategy", choices=["1", "2", "3", "4", "5"], default="3"
         )
 
         strategy_map = {
             "1": StrategyType.SUPPORT_RESISTANCE,
-            "2": StrategyType.EMA_CROSSOVER,
-            "3": StrategyType.EMA_CROSSOVER_V2,
-            "4": StrategyType.COMBINED,
-            "5": "REALTIME",  # Special marker for real-time analysis
-            "6": "MONITORING",  # Special marker for monitoring mode
-            "7": "BACKTESTING",  # Special marker for backtesting
-            "8": None,
+            "2": StrategyType.EMA_CROSSOVER_V2,
+            "3": StrategyType.COMBINED,
+            "4": "BACKTESTING",  # Special marker for backtesting
+            "5": None,
         }
 
         selected_strategy = strategy_map[choice]
 
-        if selected_strategy == "REALTIME":
-            self.console.print(f"\n✅ Selected: Real-Time Analysis", style="green")
-        elif selected_strategy == "MONITORING":
-            self.console.print(f"\n✅ Selected: Market Monitoring", style="green")
-        elif selected_strategy == "BACKTESTING":
+        if selected_strategy == "BACKTESTING":
             self.console.print(f"\n✅ Selected: Strategy Backtesting", style="green")
         elif selected_strategy:
             self.console.print(
@@ -333,8 +308,6 @@ class CLIApplication:
         # Create strategy with AI model
         if strategy_type == StrategyType.SUPPORT_RESISTANCE:
             return SupportResistanceStrategy(ai_model=ai_model)
-        elif strategy_type == StrategyType.EMA_CROSSOVER:
-            return EMACrossoverStrategy(ai_model=ai_model)
         elif strategy_type == StrategyType.EMA_CROSSOVER_V2:
             return EMACrossoverV2Strategy(ai_model=ai_model)
         elif strategy_type == StrategyType.COMBINED:
@@ -812,13 +785,6 @@ class CLIApplication:
         except Exception as e:
             logger.error("Error closing delta client", error=str(e))
         
-        # Disconnect websocket client
-        try:
-            await self.websocket_client.disconnect()
-            logger.debug("WebSocket client disconnected")
-        except Exception as e:
-            logger.error("Error disconnecting websocket client", error=str(e))
-        
         # Close any cached strategies
         try:
             for strategy_name, strategy in self.strategies.items():
@@ -826,14 +792,6 @@ class CLIApplication:
                 logger.debug("Strategy closed", strategy=strategy_name)
         except Exception as e:
             logger.error("Error closing strategies", error=str(e))
-        
-        # Close real-time analyzer
-        try:
-            if hasattr(self.realtime_analyzer, 'close'):
-                await self.realtime_analyzer.close()
-                logger.debug("Real-time analyzer closed")
-        except Exception as e:
-            logger.error("Error closing real-time analyzer", error=str(e))
         
         # Give a moment for connections to fully close
         await asyncio.sleep(0.1)

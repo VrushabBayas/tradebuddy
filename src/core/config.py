@@ -71,9 +71,6 @@ class Settings(BaseSettings):
     # API Rate Limiting
     delta_api_rate_limit: int = Field(default=10, env="DELTA_API_RATE_LIMIT")
     ollama_timeout: int = Field(default=120, env="OLLAMA_TIMEOUT")
-    websocket_reconnect_attempts: int = Field(
-        default=3, env="WEBSOCKET_RECONNECT_ATTEMPTS"
-    )
 
     # CLI Configuration
     cli_refresh_rate: float = Field(default=1.0, env="CLI_REFRESH_RATE")
@@ -93,7 +90,7 @@ class Settings(BaseSettings):
         default=["1m", "5m", "15m", "1h", "4h", "1d"]
     )
     supported_strategies: List[str] = Field(
-        default=["support_resistance", "ema_crossover", "combined"]
+        default=["support_resistance", "ema_crossover_v2", "combined"]
     )
 
     @field_validator("python_env")

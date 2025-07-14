@@ -42,7 +42,7 @@ class CLIDisplays:
         welcome_text.append("📊 Delta Exchange Market Data\n", style="white")
         welcome_text.append("🧠 Local Ollama AI Analysis\n\n", style="white")
         welcome_text.append(
-            "Choose your trading strategy and get real-time signals.", style="dim"
+            "Choose your trading strategy and get trading signals.", style="dim"
         )
 
         self.console.print(
@@ -83,28 +83,17 @@ class CLIDisplays:
             "Identifies key price levels for bounce/rejection signals",
         )
         table.add_row(
-            "2", "EMA Crossover", "Uses 9/15 EMA crossovers for trend change signals"
+            "2", "EMA Crossover", "Enhanced EMA strategy with trend analysis & filters"
         )
         table.add_row(
-            "3", "EMA Crossover V2 ⭐", "Enhanced EMA strategy with 50 EMA filter & trend analysis"
-        )
-        table.add_row(
-            "4",
+            "3",
             "Combined Strategy",
             "Combines multiple strategies for high-confidence signals",
         )
         table.add_row(
-            "5",
-            "Real-Time Analysis ⭐",
-            "Live market data streaming with real-time signals",
+            "4", "Strategy Backtesting 📊", "Test strategies against historical data"
         )
-        table.add_row(
-            "6", "Market Monitoring 🔄", "Continuous market monitoring with alerts"
-        )
-        table.add_row(
-            "7", "Strategy Backtesting 📊", "Test strategies against historical data"
-        )
-        table.add_row("8", "Exit", "Exit the application")
+        table.add_row("5", "Exit", "Exit the application")
 
         return table
 

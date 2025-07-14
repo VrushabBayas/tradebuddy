@@ -127,38 +127,10 @@ class TestCLIWorkflowFunctionality:
             cli_app.strategies[StrategyType.COMBINED].analyze.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_realtime_mode_workflow_selection(self, cli_app):
-        """Test real-time analysis mode selection and workflow."""
-        with patch.object(cli_app, 'display_welcome'), \
-             patch('rich.prompt.Prompt.ask', return_value='4'), \
-             patch.object(cli_app.realtime_analyzer, 'run_session', return_value=None) as mock_realtime, \
-             patch('rich.prompt.Confirm.ask', return_value=False), \
-             patch.object(cli_app, 'display_goodbye'):
-            
-            await cli_app.run()
-            
-            # Should invoke real-time analyzer
-            mock_realtime.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_monitoring_mode_workflow_selection(self, cli_app):
-        """Test continuous monitoring mode selection and workflow."""
-        with patch.object(cli_app, 'display_welcome'), \
-             patch('rich.prompt.Prompt.ask', return_value='5'), \
-             patch.object(cli_app.realtime_analyzer, 'run_monitoring_session', return_value=None) as mock_monitoring, \
-             patch('rich.prompt.Confirm.ask', return_value=False), \
-             patch.object(cli_app, 'display_goodbye'):
-            
-            await cli_app.run()
-            
-            # Should invoke monitoring session
-            mock_monitoring.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_backtesting_mode_workflow_selection(self, cli_app):
         """Test backtesting mode selection and workflow."""
         with patch.object(cli_app, 'display_welcome'), \
-             patch('rich.prompt.Prompt.ask', return_value='6'), \
+             patch('rich.prompt.Prompt.ask', return_value='4'), \
              patch.object(cli_app, 'run_backtesting_session', return_value=None) as mock_backtesting, \
              patch('rich.prompt.Confirm.ask', return_value=False), \
              patch.object(cli_app, 'display_goodbye'):
@@ -276,13 +248,11 @@ class TestCLIWorkflowFunctionality:
         # Verify core components are initialized
         assert cli_app.console is not None
         assert cli_app.delta_client is not None
-        assert cli_app.websocket_client is not None
-        assert cli_app.realtime_analyzer is not None
         assert cli_app.displays is not None
         
-        # Verify all strategies are available
-        assert StrategyType.EMA_CROSSOVER in cli_app.strategies
-        assert StrategyType.SUPPORT_RESISTANCE in cli_app.strategies
+        # Verify strategies dict is available (strategies created dynamically)
+        assert hasattr(cli_app, 'strategies')
+        assert isinstance(cli_app.strategies, dict)
         assert StrategyType.COMBINED in cli_app.strategies
         
         # Verify strategies are properly initialized
@@ -305,7 +275,7 @@ class TestCLIWorkflowFunctionality:
     async def test_session_configuration_persistence(self, cli_app, mock_analysis_result):
         """Test that session configuration is properly maintained throughout workflow."""
         expected_config = {
-            'strategy': StrategyType.EMA_CROSSOVER,
+            'strategy': StrategyType.EMA_CROSSOVER_V2,
             'symbol': Symbol.BTCUSD,
             'timeframe': TimeFrame.ONE_HOUR,
             'total_capital_inr': Decimal('100000'),

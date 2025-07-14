@@ -246,7 +246,7 @@ class TestCompleteSystemIntegration:
             # Test all three strategies
             strategies_to_test = [
                 StrategyType.SUPPORT_RESISTANCE,
-                StrategyType.EMA_CROSSOVER,
+                StrategyType.EMA_CROSSOVER_V2,
                 StrategyType.COMBINED,
             ]
 

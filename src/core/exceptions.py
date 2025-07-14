@@ -86,11 +86,6 @@ class SignalGenerationError(TradeBuddyException):
     pass
 
 
-class WebSocketConnectionError(TradeBuddyException):
-    """Raised when WebSocket connection fails."""
-
-    pass
-
 
 class EnvironmentError(TradeBuddyException):
     """Raised when environment validation fails."""
@@ -138,7 +133,6 @@ EXCEPTION_MAPPINGS = {
     "DATA_VALIDATION_ERROR": DataValidationError,
     "STRATEGY_ERROR": StrategyError,
     "SIGNAL_ERROR": SignalGenerationError,
-    "WEBSOCKET_ERROR": WebSocketConnectionError,
     "ENVIRONMENT_ERROR": EnvironmentError,
     "CLI_ERROR": CLIError,
     "RISK_ERROR": RiskManagementError,

@@ -10,8 +10,6 @@ Target: 30-40% complexity reduction while maintaining all functionality
 ### Current Problem
 4+ overlapping configuration classes:
 - `SessionConfig` (traditional analysis)
-- `RealTimeConfig` (live streaming) 
-- `MonitoringConfig` (continuous monitoring)
 - `BacktestConfig` (historical testing)
 
 ### Solution
@@ -117,7 +115,7 @@ class TradingConstants:
     pass
 
 class SystemConstants:
-    # Ollama, WebSocket, Rate limits combined
+    # Ollama, Rate limits combined
     OLLAMA_BASE_URL = "http://localhost:11434"
     WEBSOCKET_PING_INTERVAL = 30
     API_RATE_LIMIT = 10

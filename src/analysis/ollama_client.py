@@ -351,7 +351,7 @@ Close: ${ohlcv.close:,.2f}
 Volume: {ohlcv.volume:,.1f}"""
 
         # Add technical analysis based on strategy
-        if strategy == StrategyType.EMA_CROSSOVER:
+        if strategy == StrategyType.EMA_CROSSOVER_V2:
             base_prompt += self._add_ema_analysis(technical_analysis)
         elif strategy == StrategyType.SUPPORT_RESISTANCE:
             base_prompt += self._add_sr_analysis(technical_analysis)

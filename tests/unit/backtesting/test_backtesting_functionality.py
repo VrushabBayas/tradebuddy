@@ -179,7 +179,7 @@ class TestPortfolioFunctionality:
     def portfolio_config(self):
         """Create portfolio configuration."""
         return SessionConfig(
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             total_capital_inr=Decimal("100000"),
@@ -211,7 +211,7 @@ class TestPortfolioFunctionality:
         # Create mock trading signal
         signal = TradingSignal(
             symbol=Symbol.BTCUSD,
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             action=SignalAction.BUY,
             strength="STRONG",
             confidence=8,
@@ -322,7 +322,7 @@ class TestBacktestEngineFunctionality:
     def backtest_config(self):
         """Create backtest configuration."""
         return BacktestConfig(
-            strategy_type=StrategyType.EMA_CROSSOVER,
+            strategy_type=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             start_date=datetime.now(timezone.utc) - timedelta(days=30),
@@ -396,7 +396,7 @@ class TestBacktestEngineFunctionality:
         mock_strategy = AsyncMock()
         mock_signal = TradingSignal(
             symbol=Symbol.BTCUSD,
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             action=SignalAction.BUY,
             strength="STRONG",
             confidence=8,
@@ -407,7 +407,7 @@ class TestBacktestEngineFunctionality:
         mock_analysis = AnalysisResult(
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
-            strategy=StrategyType.EMA_CROSSOVER,
+            strategy=StrategyType.EMA_CROSSOVER_V2,
             market_data=mock_market_data,
             signals=[mock_signal],
             ai_analysis="Test analysis"
@@ -415,7 +415,7 @@ class TestBacktestEngineFunctionality:
         
         mock_strategy.analyze.return_value = mock_analysis
         
-        with patch.dict(backtest_engine.strategies, {StrategyType.EMA_CROSSOVER: mock_strategy}):
+        with patch.dict(backtest_engine.strategies, {StrategyType.EMA_CROSSOVER_V2: mock_strategy}):
             try:
                 result = await backtest_engine.run_backtest(backtest_config)
                 
@@ -493,7 +493,7 @@ class TestBacktestEngineFunctionality:
         
         for timeframe in timeframes:
             config = BacktestConfig(
-                strategy_type=StrategyType.EMA_CROSSOVER,
+                strategy_type=StrategyType.EMA_CROSSOVER_V2,
                 symbol=Symbol.BTCUSD,
                 timeframe=timeframe,
                 start_date=datetime.now(timezone.utc) - timedelta(days=7),
@@ -561,7 +561,7 @@ class TestBacktestingIntegrationFunctionality:
         # Create mock backtest result
         result = BacktestResult(
             config=BacktestConfig(
-                strategy_type=StrategyType.EMA_CROSSOVER,
+                strategy_type=StrategyType.EMA_CROSSOVER_V2,
                 symbol=Symbol.BTCUSD,
                 timeframe=TimeFrame.ONE_HOUR,
                 start_date=datetime.now(timezone.utc) - timedelta(days=30),
@@ -591,7 +591,7 @@ class TestBacktestingIntegrationFunctionality:
         """Test integration between risk management and backtesting."""
         # Test that risk management parameters are properly used in backtesting
         config = BacktestConfig(
-            strategy_type=StrategyType.EMA_CROSSOVER,
+            strategy_type=StrategyType.EMA_CROSSOVER_V2,
             symbol=Symbol.BTCUSD,
             timeframe=TimeFrame.ONE_HOUR,
             start_date=datetime.now(timezone.utc) - timedelta(days=7),
