@@ -72,16 +72,28 @@ services:
         reservations:
           memory: 4G
 
-  # FinGPT API service (using existing dockerized server)
+  # FinGPT API service (production server with real models)
   fingpt-api:
     build:
       context: /Users/vrushabhbayas/fingpt-server
     container_name: tradebuddy-fingpt
     restart: unless-stopped
+    environment:
+      - FINGPT_MODEL_VARIANT=${FINGPT_MODEL_VARIANT:-v3.2}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - TRANSFORMERS_CACHE=/app/model_cache
+    volumes:
+      - fingpt_models:/app/model_cache
     ports:
       - "8001:8000"
     networks:
       - tradebuddy-network
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 8G
     profiles:
       - fingpt
 
@@ -135,6 +147,8 @@ services:
 
 volumes:
   ollama_data:
+    driver: local
+  fingpt_models:
     driver: local
   redis_data:
     driver: local

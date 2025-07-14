@@ -70,9 +70,9 @@ class FinGPTClient(AIModelInterface):
 
     def _get_default_endpoint(self) -> str:
         """Get default FinGPT API endpoint."""
-        # In a real implementation, this would be the actual FinGPT API endpoint
-        # For now, using a placeholder that can be configured
-        return "http://localhost:8000/api/fingpt"
+        # Use environment variable or default to production server
+        import os
+        return os.getenv("FINGPT_API_ENDPOINT", "http://localhost:8001/api/fingpt")
 
     async def analyze_market(
         self,
@@ -266,7 +266,14 @@ Focus on risk management and provide specific entry/exit levels optimized for le
         except Exception as e:
             logger.warning("Real FinGPT API failed, falling back to mock", error=str(e))
         
+        # Check if we're in production mode
+        import os
+        if os.getenv("PYTHON_ENV") == "production":
+            logger.error("Production FinGPT API failed - no fallback in production mode")
+            raise APIConnectionError("FinGPT API unavailable in production mode")
+        
         # Fallback to mock response for development/testing
+        logger.info("Using mock FinGPT response for development")
         return await self._make_mock_response(prompt)
 
     async def _make_real_api_request(self, prompt: str) -> str:
@@ -318,10 +325,19 @@ Focus on risk management and provide specific entry/exit levels optimized for le
                         result = await response.json()
                         generated_text = result.get("response", result.get("text", ""))
                         
+                        if not generated_text:
+                            logger.warning("Empty response from FinGPT API")
+                            raise APIConnectionError("Empty response from FinGPT API")
+                        
                         logger.info("FinGPT API request successful", 
                                   response_length=len(generated_text),
-                                  model=self.model_variant)
+                                  model=self.model_variant,
+                                  tokens_used=result.get("tokens_used", 0))
                         return generated_text
+                    elif response.status == 503:
+                        error_text = await response.text()
+                        logger.warning("FinGPT model not ready", status=response.status, error=error_text)
+                        raise APIConnectionError("FinGPT model is still loading")
                     else:
                         error_text = await response.text()
                         logger.error("FinGPT API error", status=response.status, error=error_text)
@@ -399,7 +415,7 @@ Key factors:
 
 Recommendation: Execute with proper position sizing and risk management.
 
-Note: This is a mock response for development/testing. Enable real FinGPT API for production analysis."""
+⚠️  DEVELOPMENT MODE: Using mock FinGPT response. Deploy production FinGPT server for real analysis."""
 
         logger.debug("Mock FinGPT response generated", signal=signal, confidence=confidence)
         return mock_response
